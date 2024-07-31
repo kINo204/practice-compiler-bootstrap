@@ -1,0 +1,11 @@
+.eqv    OPEN_PAR        0
+.eqv    CLOSE_PAR       1
+.eqv    OPEN_BRAC       2
+.eqv    CLOSE_BRAC      3
+.eqv    SEMICOLON       4
+.eqv    ASSIGN          5
+.eqv    LITERAL_HEX     6
+.eqv    LITERAL_INT     7
+.eqv    IDENT           8
+.eqv    KEYWORD_INT     9
+.eqv    KEYWORD_RETURN  10
