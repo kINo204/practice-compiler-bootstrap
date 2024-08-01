@@ -9,3 +9,4 @@
 .eqv    IDENT           8
 .eqv    KEYWORD_INT     9
 .eqv    KEYWORD_RETURN  10
+.eqv    TOKEN_END       11

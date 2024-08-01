@@ -1,0 +1,5 @@
+<program> ::= <function>*
+<function> ::= <type> ident open_par close_par open_brac <statement> close_brac
+<type> ::= keyword_int
+<statement> ::= keyword_return <expr> semicolon
+<expr> ::= literal_int | literal_hex

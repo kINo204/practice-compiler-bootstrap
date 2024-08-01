@@ -2,6 +2,8 @@
 
 .data
 fname_src: .asciiz "samples/ret_2.c"
+fname_dst: .asciiz "out/ret_2.asm"
+str_include_lib: .asciiz ".include \"../lib/lib.asm\"\n\n"
 
 .text
         # Alloc file input buffer.
@@ -24,7 +26,11 @@ fname_src: .asciiz "samples/ret_2.c"
         SBRK(LTOKENS)
         PSR($v0) # token_list_base
         
-        # Tokenizing state machine.
+
+        #############
+        ##  Lexer  ##
+        #############
+
         # $s0: input_buffer_index
         lw      $s0, 8($sp)
         # $s1: token_list_index
@@ -297,9 +303,170 @@ finish_id:
         sb      $t0, ($s2)
 
         j       tokenize_start
+        nop
 
 token_err:
         PRINTLN_STR(str_lexer_err, "Lexer encountered an error.")
+        EXIT(-1)
         
 tokenize_finish:
         PRINTLN_STR(str_lexer_finish, "Lexing finished.")
+        li      $t0, TOKEN_END
+        sb      $t0, ($s1)
+
+
+        ############
+        ## Parser ##
+        ############
+
+        # Init:
+.macro BUF_APPEND(%a_str, %i_len)
+        la      $a0, %a_str
+        li      $a1, %i_len
+        jal     write_buf
+        nop
+.end_macro
+.eqv    LOUTBUF 500
+        SBRK(LOUTBUF)
+        PSR($v0) # output_buffer_base
+
+        lw      $s0, 4($sp)  # $s0: token_list_index
+        move    $s1, $v0     # $s1: output_buffer_index
+
+        BUF_APPEND(str_include_lib, 27) # Add include statement
+        j       parse_program
+        nop
+
+write_buf: # $a0: addr_str, $a1: strlen
+        .data
+        str_comma: .asciiz ":"
+        str_endl:  .asciiz "\n"
+        str_space: .asciiz " "
+        .text
+
+        PSR($ra)
+loop_wb:
+        # Copy a byte:
+        lb      $t0, ($a0)
+        sb      $t0, ($s1)
+        addi    $a0, $a0, 1
+
+        addi    $a1, $a1, -1
+        bnez    $a1, loop_wb
+        addi    $s1, $s1, 1
+# loop end
+
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
+        nop
+
+parse_function:
+        .data
+        str_globl: .asciiz ".globl "
+        str_psra:  .asciiz "\tPSR($ra)\n"
+        str_ppra:  .asciiz "\tlw\t$ra, ($sp)\n\tPPR\n"
+        .text
+
+        PSR($ra)
+
+        # Print function head infos:
+        # """
+        # .globl func_name
+        # func_name:
+        #       PSR($ra)
+        # """
+        addi    $s0, $s0, 2
+        lb      $s2, ($s0) # $s2: ident_length
+        addi    $s0, $s0, 1
+        move    $s3, $s0   # $s3: addr_ident
+        BUF_APPEND(str_globl, 7)
+        # Print ident.
+        move    $a0, $s3
+        move    $a1, $s2
+        jal     write_buf
+        nop
+        BUF_APPEND(str_endl, 1)
+        # Print ident.
+        move    $a0, $s3
+        move    $a1, $s2
+        jal     write_buf
+        nop
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+        BUF_APPEND(str_psra, 10)
+
+        addu    $s0, $s0, $s2 # $s0 on "open_par"
+        addi    $s0, $s0, 3
+        jal     parse_statement
+        nop
+
+        addi    $s0, $s0, 1 # Jump the "close_brac"
+
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
+        nop
+
+parse_type:
+
+parse_statement:
+        .data
+        str_jr: .asciiz "\tjr\t$ra\n\tnop\n" # 13
+        .text
+        PSR($ra)
+
+        # Return statement:
+        jal     parse_expr
+        addi    $s0, $s0, 1 # jump keyword_return (before parse_expr)
+        addi    $s0, $s0, 1 # jump semicolon
+        BUF_APPEND(str_ppra, 20)
+        BUF_APPEND(str_jr, 13)
+
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
+        nop
+
+parse_expr: # always get expr's value into $v0
+        PSR($ra)
+
+        # literal_int:
+        .data
+        str_pre_li_v0: .asciiz "\tli\t$v0, " # 9
+        .text
+        BUF_APPEND(str_pre_li_v0, 9)
+        addi    $s0, $s0, 1
+        lb      $a1, ($s0)
+        addi    $s0, $s0, 1
+        move    $a0, $s0
+        jal     write_buf
+        addu    $s0, $s0, $a1
+        BUF_APPEND(str_endl, 1)
+
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
+        nop
+
+parse_program:
+        lb      $t0, ($s0) # Get next token id.
+
+        li      $t1, TOKEN_END # Quit on finishing the tokens.
+        beq     $t0, $t1, parse_finish
+        nop
+
+        jal     parse_function
+        nop
+
+        j       parse_program # Forever loop.
+        nop
+
+parse_finish:
+        PRINTLN_STR(str_parser_finish, "Parsing finished.")
+
+        OPEN(fname_dst, 1, 0) # Write output file.
+        lw      $t0, ($sp) # output_buf_base
+        subu    $t1, $s1, $t0 # output_buf_len
+        WRITE($v0, $t0, $t1)
+

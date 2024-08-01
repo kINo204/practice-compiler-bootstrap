@@ -53,11 +53,11 @@
         syscall
 .end_macro
 
-.macro WRITE(%r_fd, %r_buf, %i_nchar)
+.macro WRITE(%r_fd, %r_buf, %r_nchar)
         move    $a0, %r_fd
         move    $a1, %r_buf
-        li      $a2, %i_nchar
-        li      $v0, 14
+        move    $a2, %r_nchar
+        li      $v0, 15
         syscall
 .end_macro
 
