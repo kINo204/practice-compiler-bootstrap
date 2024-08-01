@@ -363,6 +363,7 @@ loop_wb:
 
 parse_function:
         .data
+        str_textseg: .asciiz ".text\n" # 6
         str_globl: .asciiz ".globl "
         str_psra:  .asciiz "\tPSR($ra)\n"
         str_ppra:  .asciiz "\tlw\t$ra, ($sp)\n\tPPR\n"
@@ -372,15 +373,17 @@ parse_function:
 
         # Print function head infos:
         # """
+        # .text
         # .globl func_name
         # func_name:
         #       PSR($ra)
         # """
+        BUF_APPEND(str_textseg, 6)
+        BUF_APPEND(str_globl, 7)
         addi    $s0, $s0, 2
         lb      $s2, ($s0) # $s2: ident_length
         addi    $s0, $s0, 1
         move    $s3, $s0   # $s3: addr_ident
-        BUF_APPEND(str_globl, 7)
         # Print ident.
         move    $a0, $s3
         move    $a1, $s2

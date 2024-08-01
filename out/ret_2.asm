@@ -1,5 +1,6 @@
 .include "../lib/lib.asm"
 
+.text
 .globl main
 main:
 	PSR($ra)
