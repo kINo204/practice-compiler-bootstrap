@@ -1,11 +1,25 @@
-<open_par> ::= "("
-<close_par> ::= ")"
-<open_brac> ::= "{"
-<close_brac> ::= "}"
-<semicolon> ::= ";"
-<assign> ::= "="
-<keyword_int> ::= "int"
-<keyword_return> ::= "return"
-<literal_int> ::= "\d+"
-<literal_hex> ::= "0x[\da-fA-F]+"
-<ident> ::= "[a-zA-Z][a-zA-Z_\d]*"
+# Characters
+open_par ::= "("
+close_par ::= ")"
+open_brac ::= "{"
+close_brac ::= "}"
+semicolon ::= ";"
+
+# Operators
+assign ::= "="
+### Arithmetic
+bit_compl ::= "~"
+plus ::= "+"
+minus ::= "-"
+### Logical
+negation ::= !
+
+# Keywords
+keyword_int ::= "int"
+keyword_return ::= "return"
+
+# Literals
+literal_int ::= "\d+"
+literal_hex ::= "0x[\da-fA-F]+"
+
+ident ::= "[a-zA-Z][a-zA-Z_\d]*"

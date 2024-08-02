@@ -1,5 +1,32 @@
-<program> ::= <function>*
-<function> ::= <type> ident open_par close_par open_brac <statement> close_brac
-<type> ::= keyword_int
-<statement> ::= keyword_return <expr> semicolon
-<expr> ::= literal_int | literal_hex
+<program>
+        : <func_def>*
+        ;
+
+<func_def>
+        : <func_type> ident open_par close_par open_brac <statement> close_brac
+        ;
+
+<func_type>
+        : keyword_int
+        ;
+
+<statement>
+        : keyword_return <expr> semicolon
+        ;
+
+<expr>
+        : <literal>
+        | <unary_op> <expr>
+        ;
+
+<unary_op>
+        : bit_compl
+        | minus
+        | negation
+        ;
+
+
+<literal>
+        : literal_int
+        | literal_hex
+        ;

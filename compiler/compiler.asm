@@ -110,10 +110,50 @@ semicolon:
 
 assignment:
         li      $t1, '='
-        bne     $t0, $t1, literal_hex
+        bne     $t0, $t1, bit_compl
         li      $t1, ASSIGN
 
         PRINTLN_STR(str_lexer_assignment, "ASSIGN")
+        sb      $t1, ($s1)
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
+bit_compl:
+        li      $t1, '~'
+        bne     $t0, $t1, plus
+        li      $t1, BIT_COMPL
+
+        PRINTLN_STR(str_lexer_bit_compl, "BIT_COMPL")
+        sb      $t1, ($s1)
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
+plus:
+        li      $t1, '+'
+        bne     $t0, $t1, minus
+        li      $t1, PLUS
+
+        PRINTLN_STR(str_lexer_plus, "PLUS")
+        sb      $t1, ($s1)
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
+minus:
+        li      $t1, '-'
+        bne     $t0, $t1, negation
+        li      $t1, MINUS
+
+        PRINTLN_STR(str_lexer_minus, "MINUS")
+        sb      $t1, ($s1)
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
+negation:
+        li      $t1, '!'
+        bne     $t0, $t1, literal_hex
+        li      $t1, NEGATION
+
+        PRINTLN_STR(str_lexer_negation, "NEGATION")
         sb      $t1, ($s1)
         j       tokenize_start
         addi    $s1, $s1, 1
@@ -326,12 +366,39 @@ tokenize_finish:
         jal     write_buf
         nop
 .end_macro
+
+.macro BUF_TAG(%i_inc)
+        srl     $t1, $s2, 24
+        andi    $t1, $t1, 0xff
+        addi    $t1, $t1, 65
+        sb      $t1, 0($s1)
+
+        srl     $t1, $s2, 16
+        andi    $t1, $t1, 0xff
+        addi    $t1, $t1, 65
+        sb      $t1, 1($s1)
+
+        srl     $t1, $s2, 8
+        andi    $t1, $t1, 0xff
+        addi    $t1, $t1, 65
+        sb      $t1, 2($s1)
+
+        andi    $t1, $s2, 0xff
+        addi    $t1, $t1, 65
+        sb      $t1, 3($s1)
+
+        addi    $s1, $s1, 4
+
+        addi    $s2, $s2, %i_inc
+.end_macro
+
 .eqv    LOUTBUF 500
         SBRK(LOUTBUF)
         PSR($v0) # output_buffer_base
 
         lw      $s0, 4($sp)  # $s0: token_list_index
-        move    $s1, $v0     # $s1: output_buffer_index
+        lw      $s1, 0($sp)  # $s1: output_buffer_index
+        li      $s2, 0       # $s2: tag_cnt
 
         BUF_APPEND(str_include_lib, 27) # Add include statement
         j       parse_program
@@ -342,6 +409,7 @@ write_buf: # $a0: addr_str, $a1: strlen
         str_comma: .asciiz ":"
         str_endl:  .asciiz "\n"
         str_space: .asciiz " "
+        str_nop:   .asciiz "\tnop\n" # 5
         .text
 
         PSR($ra)
@@ -361,12 +429,12 @@ loop_wb:
         jr      $ra
         nop
 
-parse_function:
+parse_func_def:
         .data
         str_textseg: .asciiz ".text\n" # 6
-        str_globl: .asciiz ".globl "
-        str_psra:  .asciiz "\tPSR($ra)\n"
-        str_ppra:  .asciiz "\tlw\t$ra, ($sp)\n\tPPR\n"
+        str_globl: .asciiz ".globl " # 7
+        str_psra:  .asciiz "\tPSR($ra)\n" # 10
+        str_ppra:  .asciiz "\tlw\t$ra, ($sp)\n\tPPR\n" # 20
         .text
 
         PSR($ra)
@@ -381,25 +449,26 @@ parse_function:
         BUF_APPEND(str_textseg, 6)
         BUF_APPEND(str_globl, 7)
         addi    $s0, $s0, 2
-        lb      $s2, ($s0) # $s2: ident_length
+        lb      $s3, ($s0) # $s3: ident_length
         addi    $s0, $s0, 1
-        move    $s3, $s0   # $s3: addr_ident
+        move    $s4, $s0   # $s4 addr_ident
+
         # Print ident.
-        move    $a0, $s3
-        move    $a1, $s2
+        move    $a0, $s4
+        move    $a1, $s3
         jal     write_buf
         nop
         BUF_APPEND(str_endl, 1)
         # Print ident.
-        move    $a0, $s3
-        move    $a1, $s2
+        move    $a0, $s4
+        move    $a1, $s3
         jal     write_buf
         nop
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_psra, 10)
 
-        addu    $s0, $s0, $s2 # $s0 on "open_par"
+        addu    $s0, $s0, $s3 # $s0 on "open_par"
         addi    $s0, $s0, 3
         jal     parse_statement
         nop
@@ -432,12 +501,26 @@ parse_statement:
         nop
 
 parse_expr: # always get expr's value into $v0
-        PSR($ra)
-
-        # literal_int:
         .data
         str_pre_li_v0: .asciiz "\tli\t$v0, " # 9
+        str_pre_li_v1: .asciiz "\tli\t$v1, " # 9
         .text
+
+        PSR($ra)
+        lb      $t0, ($s0)
+        li      $t1, LITERAL_INT
+        beq     $t0, $t1, pe_literal_int
+        li      $t1, LITERAL_HEX
+        beq     $t0, $t1, pe_literal_hex
+        li      $t1, BIT_COMPL
+        beq     $t0, $t1, pe_bit_compl
+        li      $t1, MINUS
+        beq     $t0, $t1, pe_minus
+        li      $t1, NEGATION
+        beq     $t0, $t1, pe_negation
+        nop
+
+pe_literal_int:
         BUF_APPEND(str_pre_li_v0, 9)
         addi    $s0, $s0, 1
         lb      $a1, ($s0)
@@ -446,7 +529,79 @@ parse_expr: # always get expr's value into $v0
         jal     write_buf
         addu    $s0, $s0, $a1
         BUF_APPEND(str_endl, 1)
+        j       pe_finish
+        nop
 
+pe_literal_hex:
+        .data
+        str_hex_pre: .asciiz "0x"
+        .text
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_hex_pre, 2)
+        addi    $s0, $s0, 1
+        lb      $a1, ($s0)
+        addi    $s0, $s0, 1
+        move    $a0, $s0
+        jal     write_buf
+        addu    $s0, $s0, $a1
+        BUF_APPEND(str_endl, 1)
+        j       pe_finish
+        nop
+
+pe_bit_compl:
+        .data
+        str_xori_f: .asciiz "\txori\t$v0, $v0, 0xffffffff\n" # 27
+        .text
+        jal     parse_expr  # Get sub-expr's value in $v0
+        addi    $s0, $s0, 1
+        BUF_APPEND(str_xori_f, 27)
+        j       pe_finish
+        nop
+
+pe_minus:
+        .data
+        str_subu_v0: .asciiz "\tsubu\t$v0, $0, $v0\n" # 19
+        .text
+        jal     parse_expr  # Get sub-expr's value in $v0
+        addi    $s0, $s0, 1
+        BUF_APPEND(str_subu_v0, 19)
+        j       pe_finish
+        nop
+
+pe_negation:
+        .data
+        str_pre_beqz_v0: .asciiz "\tbeqz\t$v0, "  # 11
+        str_char_0:  .asciiz "0"
+        str_char_1:  .asciiz "1"
+        str_move_v0_v1: .asciiz "\tmove\t$v0, $v1\n" # 15
+        .text
+        jal     parse_expr  # Get sub-expr's value in $v0
+        addi    $s0, $s0, 1
+        # li   $v1, 1
+        BUF_APPEND(str_pre_li_v1, 9)
+        BUF_APPEND(str_char_1, 1)
+        BUF_APPEND(str_endl, 1)
+        # beqz $v0, eqz
+        BUF_APPEND(str_pre_beqz_v0, 11)
+        BUF_TAG(0)
+        BUF_APPEND(str_endl, 1)
+        # nop
+        BUF_APPEND(str_nop, 5)
+        # li   $v1, 0
+        BUF_APPEND(str_pre_li_v1, 9)
+        BUF_APPEND(str_char_0, 1)
+        BUF_APPEND(str_endl, 1)
+        # eqz:
+        BUF_TAG(0)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+        # move $v0, $v1
+        BUF_APPEND(str_move_v0_v1, 15)
+
+        j       pe_finish
+        nop
+
+pe_finish:
         lw      $ra, ($sp)
         PPR
         jr      $ra
@@ -459,7 +614,7 @@ parse_program:
         beq     $t0, $t1, parse_finish
         nop
 
-        jal     parse_function
+        jal     parse_func_def
         nop
 
         j       parse_program # Forever loop.
