@@ -14,3 +14,5 @@
 .eqv    LITERAL_HEX     13
 .eqv    IDENT           14
 .eqv    TOKEN_END       15
+.eqv    TMULT           16
+.eqv    TDIV            17

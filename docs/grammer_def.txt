@@ -15,8 +15,17 @@
         ;
 
 <expr>
-        : <literal>
-        | <unary_op> <expr>
+        : <term> { ("+" | "-") <term> }
+        ;
+
+<term>
+        : <factor> { ("*" | "/") <factor> }
+        ;
+
+<factor>
+        : open_par <expr> close_par
+        | <unary_op> <factor>
+        | <literal> 
         ;
 
 <unary_op>

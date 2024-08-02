@@ -141,10 +141,30 @@ plus:
 
 minus:
         li      $t1, '-'
-        bne     $t0, $t1, negation
+        bne     $t0, $t1, tmult
         li      $t1, MINUS
 
         PRINTLN_STR(str_lexer_minus, "MINUS")
+        sb      $t1, ($s1)
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
+tmult: # 't' stands for token.
+        li      $t1, '*'
+        bne     $t0, $t1, tdiv
+        li      $t1, TMULT
+
+        PRINTLN_STR(str_lexer_mult, "MULT")
+        sb      $t1, ($s1)
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
+tdiv: # 't' stands for token.
+        li      $t1, '/'
+        bne     $t0, $t1, negation
+        li      $t1, TDIV
+
+        PRINTLN_STR(str_lexer_div, "DIV")
         sb      $t1, ($s1)
         j       tokenize_start
         addi    $s1, $s1, 1
@@ -523,23 +543,152 @@ parse_expr: # always get expr's value into $v0
         .data
         str_pre_li_v0: .asciiz "\tli\t$v0, " # 9
         str_pre_li_v1: .asciiz "\tli\t$v1, " # 9
+        str_psr_v0: .asciiz "\tPSR($v0)\n" # 10
         .text
-
         PSR($ra)
+
+        jal     parse_term
+        nop
+        BUF_APPEND(str_psr_v0, 10)
+pe_loop_term:
         lb      $t0, ($s0)
-        li      $t1, LITERAL_INT
-        beq     $t0, $t1, pe_literal_int
-        li      $t1, LITERAL_HEX
-        beq     $t0, $t1, pe_literal_hex
-        li      $t1, BIT_COMPL
-        beq     $t0, $t1, pe_bit_compl
-        li      $t1, MINUS
-        beq     $t0, $t1, pe_minus
-        li      $t1, NEGATION
-        beq     $t0, $t1, pe_negation
+        li      $t1, PLUS
+        beq     $t0, $t1, pe_plus_term
+        li      $t2, MINUS
+        beq     $t0, $t2, pe_minus_term
+        nop
+        j       pe_loop_term_finish
+        nop
+pe_plus_term:
+        jal     parse_term
+        addi    $s0, $s0, 1
+        .data
+        str_lw_v1: .asciiz "\tlw\t$v1, ($sp)\n" # 15
+        str_addu_v0_v1: .asciiz "\taddu\t$v0, $v1, $v0\n" # 20
+        str_subu_v1_v0: .asciiz "\tsubu\t$v0, $v1, $v0\n" # 20
+        str_ppr: .asciiz "\tPPR\n" # 5
+        .text
+        # lw $v1, ($sp)
+        BUF_APPEND(str_lw_v1, 15)
+        # PPR
+        BUF_APPEND(str_ppr, 5)
+        # addu $v0, $v1, $v0
+        BUF_APPEND(str_addu_v0_v1, 20)
+        # PSR($v0)
+        BUF_APPEND(str_psr_v0, 10)
+        j       pe_loop_term
+        nop
+pe_minus_term:
+        jal     parse_term
+        addi    $s0, $s0, 1
+        # lw $v1, ($sp)
+        BUF_APPEND(str_lw_v1, 15)
+        # PPR
+        BUF_APPEND(str_ppr, 5)
+        # subu $v0, $v1, $v0
+        BUF_APPEND(str_subu_v1_v0, 20)
+        # PSR($v0)
+        BUF_APPEND(str_psr_v0, 10)
+        j       pe_loop_term
+        nop
+pe_loop_term_finish:
+        .data
+        str_lw_v0: .asciiz "\tlw\t$v0, ($sp)\n" # 15
+        .text
+        # lw $v0, ($sp)
+        BUF_APPEND(str_lw_v0, 15)
+        # PPR
+        BUF_APPEND(str_ppr, 5)
+
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
         nop
 
-pe_literal_int:
+parse_term:
+        PSR($ra)
+
+        jal     parse_fact
+        nop
+        BUF_APPEND(str_psr_v0, 10)
+pt_loop_fact:
+        lb      $t0, ($s0)
+        li      $t1, TMULT
+        beq     $t0, $t1, pt_mult_fact
+        li      $t2, TDIV
+        beq     $t0, $t2, pt_div_fact
+        nop
+        j       pt_loop_fact_finish
+        nop
+pt_mult_fact:
+        .data
+        str_mul_v0_v1: .asciiz "\tmul\t$v0, $v1, $v0\n" # 19
+        .text
+        jal     parse_fact
+        addi    $s0, $s0, 1
+        # lw $v1, ($sp)
+        BUF_APPEND(str_lw_v1, 15)
+        # PPR
+        BUF_APPEND(str_ppr, 5)
+        # mul $v0, $v1, $v0
+        BUF_APPEND(str_mul_v0_v1, 19)
+        # PSR($v0)
+        BUF_APPEND(str_psr_v0, 10)
+        j       pt_loop_fact
+        nop
+pt_div_fact:
+        .data
+        str_div_v1_v0: .asciiz "\tdiv\t$v0, $v1, $v0\n" # 19
+        .text
+        jal     parse_fact
+        addi    $s0, $s0, 1
+        # lw $v1, ($sp)
+        BUF_APPEND(str_lw_v1, 15)
+        # PPR
+        BUF_APPEND(str_ppr, 5)
+        # div $v0, $v1, $v0
+        BUF_APPEND(str_div_v1_v0, 19)
+        # PSR($v0)
+        BUF_APPEND(str_psr_v0, 10)
+        j       pt_loop_fact
+        nop
+pt_loop_fact_finish:
+        # lw $v0, ($sp)
+        BUF_APPEND(str_lw_v0, 15)
+        # PPR
+        BUF_APPEND(str_ppr, 5)
+
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
+        nop
+
+parse_fact:
+        PSR($ra)
+        lb      $t0, ($s0)
+        li      $t1, OPEN_PAR
+        beq     $t0, $t1, pf_more_expr
+        li      $t1, LITERAL_INT
+        beq     $t0, $t1, pf_literal_int
+        li      $t1, LITERAL_HEX
+        beq     $t0, $t1, pf_literal_hex
+        li      $t1, BIT_COMPL
+        beq     $t0, $t1, pf_bit_compl
+        li      $t1, MINUS
+        beq     $t0, $t1, pf_minus
+        li      $t1, NEGATION
+        beq     $t0, $t1, pf_negation
+        nop
+
+pf_more_expr:
+        jal     parse_expr
+        addi    $s0, $s0, 1
+
+        addi    $s0, $s0, 1
+        j       pf_finish
+        nop
+
+pf_literal_int:
         BUF_APPEND(str_pre_li_v0, 9)
         addi    $s0, $s0, 1
         lb      $a1, ($s0)
@@ -548,10 +697,10 @@ pe_literal_int:
         jal     write_buf
         addu    $s0, $s0, $a1
         BUF_APPEND(str_endl, 1)
-        j       pe_finish
+        j       pf_finish
         nop
 
-pe_literal_hex:
+pf_literal_hex:
         .data
         str_hex_pre: .asciiz "0x"
         .text
@@ -564,30 +713,30 @@ pe_literal_hex:
         jal     write_buf
         addu    $s0, $s0, $a1
         BUF_APPEND(str_endl, 1)
-        j       pe_finish
+        j       pf_finish
         nop
 
-pe_bit_compl:
+pf_bit_compl:
         .data
         str_xori_f: .asciiz "\txori\t$v0, $v0, 0xffffffff\n" # 27
         .text
         jal     parse_expr  # Get sub-expr's value in $v0
         addi    $s0, $s0, 1
         BUF_APPEND(str_xori_f, 27)
-        j       pe_finish
+        j       pf_finish
         nop
 
-pe_minus:
+pf_minus:
         .data
         str_subu_v0: .asciiz "\tsubu\t$v0, $0, $v0\n" # 19
         .text
         jal     parse_expr  # Get sub-expr's value in $v0
         addi    $s0, $s0, 1
         BUF_APPEND(str_subu_v0, 19)
-        j       pe_finish
+        j       pf_finish
         nop
 
-pe_negation:
+pf_negation:
         .data
         str_pre_beqz_v0: .asciiz "\tbeqz\t$v0, "  # 11
         str_char_0:  .asciiz "0"
@@ -617,10 +766,10 @@ pe_negation:
         # move $v0, $v1
         BUF_APPEND(str_move_v0_v1, 15)
 
-        j       pe_finish
+        j       pf_finish
         nop
 
-pe_finish:
+pf_finish:
         lw      $ra, ($sp)
         PPR
         jr      $ra

@@ -73,11 +73,11 @@
 #####
 
 .macro  ENTRY
-        PRINTLN_STR(STR_ENTRY, "PROGRAM ENTRY")
+        PRINTLN_STR(STR_ENTRY, "Running program ...")
         jal     main
         nop
         move    $v1, $v0
-        PRINT_STR(STR_END, "PROGRAM EXIT, VAL=")
+        PRINT_STR(STR_END, "Program exits with value ")
         PRINT_INT($v1)
         EXIT(0)
 .end_macro

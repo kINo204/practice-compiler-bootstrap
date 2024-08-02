@@ -1,3 +1,3 @@
 int main() {
-    return 0xa;
+    return 9 + 8 * 6 / 2;
 }
