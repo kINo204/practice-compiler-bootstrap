@@ -179,7 +179,13 @@ loop_lh:
         sltu    $t2, $t1, $t0
         li      $t1, ':'
         sltu    $t3, $t0, $t1
+        li      $t1, '`'
+        sltu    $t4, $t1, $t0
+        li      $t1, 'g'
+        sltu    $t5, $t0, $t1
         and     $t1, $t2, $t3
+        and     $t4, $t4, $t5
+        or      $t1, $t1, $t4
         beqz    $t1, finish_lh # Break if non-digit.
         nop
         sb      $t0, ($s1) # Save the token content byte.

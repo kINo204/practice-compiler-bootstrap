@@ -1,7 +1,3 @@
 int main() {
-    return 0;
-}
-
-int fun() {
-    return -1;
+    return 0xa;
 }
