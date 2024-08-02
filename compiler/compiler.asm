@@ -3,7 +3,8 @@
 .data
 fname_src: .asciiz "samples/ret_2.c"
 fname_dst: .asciiz "out/ret_2.asm"
-str_include_lib: .asciiz ".include \"../lib/lib.asm\"\n\n"
+str_include_lib: .asciiz ".include \"../lib/lib.asm\"\n" # 26
+str_sysent: .asciiz "ENTRY\n\n"
 
 .text
         # Alloc file input buffer.
@@ -400,7 +401,8 @@ tokenize_finish:
         lw      $s1, 0($sp)  # $s1: output_buffer_index
         li      $s2, 0       # $s2: tag_cnt
 
-        BUF_APPEND(str_include_lib, 27) # Add include statement
+        BUF_APPEND(str_include_lib, 26) # Add include statement.
+        BUF_APPEND(str_sysent, 7) # Add system entry.
         j       parse_program
         nop
 
@@ -470,10 +472,21 @@ parse_func_def:
 
         addu    $s0, $s0, $s3 # $s0 on "open_par"
         addi    $s0, $s0, 3
-        jal     parse_statement
+
+pfd_loop:
+        lb      $t0, ($s0)
+        li      $t1, CLOSE_BRAC
+        beq     $t0, $t1, pfd_finish
         nop
 
+        jal     parse_statement
+        nop
+        j       pfd_loop
+        nop
+
+pfd_finish:
         addi    $s0, $s0, 1 # Jump the "close_brac"
+        BUF_APPEND(str_endl, 1)
 
         lw      $ra, ($sp)
         PPR

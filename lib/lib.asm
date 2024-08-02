@@ -72,12 +72,28 @@
 # System I/O
 #####
 
+.macro  ENTRY
+        PRINTLN_STR(STR_ENTRY, "PROGRAM ENTRY")
+        jal     main
+        nop
+        move    $v1, $v0
+        PRINT_STR(STR_END, "PROGRAM EXIT, VAL=")
+        PRINT_INT($v1)
+        EXIT(0)
+.end_macro
+
 .data
 STR_ENDL: .asciiz "\n"
 
 .macro PRINT_CH(%r_char)
         move    $a0, %r_char
         li      $v0, 11
+        syscall
+.end_macro
+
+.macro PRINT_INT(%r_int)
+        move    $a0, %r_int
+        li      $v0, 1
         syscall
 .end_macro
 
