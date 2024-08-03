@@ -26,7 +26,7 @@ main:
 	PPR
 	lw	$v1, ($sp)
 	PPR
-	addu	$v0, $v1, $v0
+	subu	$v0, $v1, $v0
 	PSR($v0)
 	lw	$v0, ($sp)
 	PPR

@@ -16,3 +16,13 @@
 .eqv    TOKEN_END       15
 .eqv    TMULT           16
 .eqv    TDIV            17
+.eqv    TAND            18
+.eqv    TOR             19
+.eqv    EQUAL           20
+.eqv    NOT_EQUAL       21
+.eqv    LESS_THAN       22
+.eqv    LESS_EQUAL      23
+.eqv    GREATER_THAN    24
+.eqv    GREATER_EQUAL   25
+.eqv    BIT_AND         26
+.eqv    BIT_OR          27

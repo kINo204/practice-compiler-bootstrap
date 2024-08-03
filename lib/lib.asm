@@ -77,7 +77,7 @@
         jal     main
         nop
         move    $v1, $v0
-        PRINT_STR(STR_END, "Program exits with value ")
+        PRINT_STR(STR_END, "Program exits with return value ")
         PRINT_INT($v1)
         EXIT(0)
 .end_macro

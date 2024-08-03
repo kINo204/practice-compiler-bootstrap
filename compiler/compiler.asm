@@ -112,9 +112,20 @@ semicolon:
 assignment:
         li      $t1, '='
         bne     $t0, $t1, bit_compl
-        li      $t1, ASSIGN
-
+        nop
+        lb      $t0, ($s0) # Check next byte
+        bne     $t0, $t1, ta_true_assign
+        nop
+# equality:
+        PRINTLN_STR(str_lexer_equal, "EQUAL")
+        addi    $s0, $s0, 1
+        j       ta_finish
+        li      $t1, EQUAL
+ta_true_assign:
         PRINTLN_STR(str_lexer_assignment, "ASSIGN")
+        j       ta_finish
+        li      $t1, ASSIGN
+ta_finish:
         sb      $t1, ($s1)
         j       tokenize_start
         addi    $s1, $s1, 1
@@ -171,10 +182,109 @@ tdiv: # 't' stands for token.
 
 negation:
         li      $t1, '!'
-        bne     $t0, $t1, literal_hex
-        li      $t1, NEGATION
-
+        bne     $t0, $t1, tand
+        nop
+# Check next byte:
+        li      $t1, '='
+        lb      $t0, ($s0)
+        bne     $t0, $t1, tn_true_neg
+        nop
+# not equal
+        PRINTLN_STR(str_lexer_not_equal, "NOT_EQUAL")
+        addi    $s0, $s0, 1
+        j       tn_finish
+        li      $t1, NOT_EQUAL
+        tn_true_neg:
         PRINTLN_STR(str_lexer_negation, "NEGATION")
+        j       tn_finish
+        li      $t1, NEGATION
+tn_finish:
+        sb      $t1, ($s1)
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
+tand:
+        li      $t1, '&'
+        bne     $t0, $t1, tor
+        nop
+        lb      $t0, ($s0) # Check next byte
+        bne     $t0, $t1, tand_bit_and
+        nop
+# logical and:
+        PRINTLN_STR(str_lexer_and, "AND")
+        addi    $s0, $s0, 1
+        j       tand_finish
+        li      $t1, TAND
+tand_bit_and:
+        PRINTLN_STR(str_lexer_bit_and, "BIT_AND")
+        j       tand_finish
+        li      $t1, BIT_AND
+tand_finish:
+        sb      $t1, ($s1)
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
+tor:
+        li      $t1, '|'
+        bne     $t0, $t1, less
+        nop
+        lb      $t0, ($s0) # Check next byte
+        bne     $t0, $t1, tor_bit_or
+        nop
+# equality:
+        PRINTLN_STR(str_lexer_or, "OR")
+        addi    $s0, $s0, 1
+        j       tor_finish
+        li      $t1, TOR
+tor_bit_or:
+        PRINTLN_STR(str_lexer_bit_or, "BIT_OR")
+        j       tor_finish
+        li      $t1, BIT_OR
+tor_finish:
+        sb      $t1, ($s1)
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
+less:
+        li      $t1, '<'
+        bne     $t0, $t1, greater
+        nop
+        li      $t1, '='
+        lb      $t0, ($s0) # Check next byte
+        bne     $t0, $t1, tl_true_less
+        nop
+# less equal:
+        PRINTLN_STR(str_lexer_less_equal, "LESS_EQUAL")
+        addi    $s0, $s0, 1
+        j       tl_finish
+        li      $t1, LESS_EQUAL
+tl_true_less:
+        PRINTLN_STR(str_lexer_less, "LESS_THAN")
+        j       tl_finish
+        li      $t1, LESS_THAN
+tl_finish:
+        sb      $t1, ($s1)
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
+greater:
+        li      $t1, '>'
+        bne     $t0, $t1, literal_hex
+        nop
+        li      $t1, '='
+        lb      $t0, ($s0) # Check next byte
+        bne     $t0, $t1, tg_true_great
+        nop
+# greater equal:
+        PRINTLN_STR(str_lexer_greater_equal, "GREATER_EQUAL")
+        addi    $s0, $s0, 1
+        j       tg_finish
+        li      $t1, GREATER_EQUAL
+tg_true_great:
+        PRINTLN_STR(str_lexer_greater, "GREATER_THAN")
+        j       tg_finish
+        li      $t1, GREATER_THAN
+tg_finish:
         sb      $t1, ($s1)
         j       tokenize_start
         addi    $s1, $s1, 1
