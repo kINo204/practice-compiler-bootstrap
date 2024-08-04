@@ -535,7 +535,7 @@ tokenize_finish:
 
         lw      $s0, 4($sp)  # $s0: token_list_index
         lw      $s1, 0($sp)  # $s1: output_buffer_index
-        li      $s2, 0       # $s2: tag_cnt
+        li      $s2, 0       # $s2: tag_cnt (auto, don't occupy!)
 
         BUF_APPEND(str_include_lib, 26) # Add include statement.
         BUF_APPEND(str_sysent, 7) # Add system entry.
@@ -638,8 +638,8 @@ parse_statement:
         PSR($ra)
 
         # Return statement:
-        jal     parse_expr
-        addi    $s0, $s0, 1 # jump keyword_return (before parse_expr)
+        jal     parse_exp
+        addi    $s0, $s0, 1 # jump keyword_return (before )parse_exp
         addi    $s0, $s0, 1 # jump semicolon
         BUF_APPEND(str_ppra, 20)
         BUF_APPEND(str_jr, 13)
@@ -649,67 +649,410 @@ parse_statement:
         jr      $ra
         nop
 
-parse_expr: # always get expr's value into $v0
         .data
         str_pre_li_v0: .asciiz "\tli\t$v0, " # 9
         str_pre_li_v1: .asciiz "\tli\t$v1, " # 9
         str_psr_v0: .asciiz "\tPSR($v0)\n" # 10
+        str_lw_v0_sp: .asciiz "\tlw\t$v0, ($sp)\n" # 15
         .text
+parse_exp:
+        .data
+        str_pre_bnez_v0: .asciiz "\tbnez\t$v0, " # 11
+        .text
+        PSR($ra)
+        jal     parse_and_exp   # Parse first and exp;
+        nop
+
+        li      $t1, TOR        # Check for "||" token;
+        lb      $t0, ($s0)
+        bne     $t0, $t1, pe_finish
+        nop
+# Contains token "||":
+        PSR($s2) # tags: f1, f
+        addi    $s2, $s2, 2
+
+        BUF_APPEND(str_pre_bnez_v0, 11) # bnez $v0, f1
+        move    $s3, $s2
+        lw      $s2, ($sp)
+        BUF_TAG(0)
+        move    $s2, $s3
+        BUF_APPEND(str_endl, 1)
+        BUF_APPEND(str_nop, 5) # nop
+pe_loop:
+        jal     parse_and_exp   # Parse next and exp;
+        addi    $s0, $s0, 1
+        BUF_APPEND(str_pre_bnez_v0, 11) # bnez $v0, f1
+        move    $s3, $s2
+        lw      $s2, ($sp)
+        BUF_TAG(0)
+        move    $s2, $s3
+        BUF_APPEND(str_endl, 1)
+        BUF_APPEND(str_nop, 5) # nop
+        li      $t1, TOR        # Check for "||" token;
+        lb      $t0, ($s0)
+        bne     $t0, $t1, pe_gen
+        nop
+        j       pe_loop         # Loop back.
+        nop
+pe_gen:
+        .data
+        str_pre_jump: .asciiz "\tj\t" # 3
+        .text
+        # j f
+        BUF_APPEND(str_pre_jump, 3)
+        move    $s3, $s2
+        lw      $s2, ($sp)
+        addi    $s2, $s2, 1
+        BUF_TAG(0)
+        BUF_APPEND(str_endl, 1)
+        # li $v0, 0
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_0, 1)
+        BUF_APPEND(str_endl, 1)
+        # f1: li $v0, 1
+        addi    $s2, $s2, -1
+        BUF_TAG(0)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_1, 1)
+        BUF_APPEND(str_endl, 1)
+        # f:
+        addi    $s2, $s2, 1
+        BUF_TAG(0)
+        move    $s2, $s3
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+
+        # PPR $s2 after use.
+        PPR
+pe_finish:
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
+        nop
+
+parse_and_exp:
+        PSR($ra)
+        jal     parse_eql_exp   # Parse first eql exp;
+        nop
+
+        li      $t1, TAND       # Check for "&& token;
+        lb      $t0, ($s0)
+        bne     $t0, $t1, pa_finish
+        nop
+# Contains token "&&"
+        PSR($s2) # tags: f0, f
+        addi    $s2, $s2, 2
+
+        BUF_APPEND(str_pre_beqz_v0, 11) # beqz $v0, f0
+        move    $s3, $s2
+        lw      $s2, ($sp)
+        BUF_TAG(0)
+        move    $s2, $s3
+        BUF_APPEND(str_endl, 1)
+        BUF_APPEND(str_nop, 5) # nop
+pa_loop:
+        jal     parse_eql_exp   # Parse next eql exp;
+        addi    $s0, $s0, 1
+        BUF_APPEND(str_pre_beqz_v0, 11) # beqz $v0, f0
+        move    $s3, $s2
+        lw      $s2, ($sp)
+        BUF_TAG(0)
+        move    $s2, $s3
+        BUF_APPEND(str_endl, 1)
+        BUF_APPEND(str_nop, 5) # nop
+        li      $t1, TAND       # Check for "&& token;
+        lb      $t0, ($s0)
+        bne     $t0, $t1, pa_gen
+        nop
+        j       pa_loop         # Loop back.
+        nop
+pa_gen:
+        # j f
+        BUF_APPEND(str_pre_jump, 3)
+        move    $s3, $s2
+        lw      $s2, ($sp)
+        addi    $s2, $s2, 1
+        BUF_TAG(0)
+        BUF_APPEND(str_endl, 1)
+        # li $v0, 1
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_1, 1)
+        BUF_APPEND(str_endl, 1)
+        # f1: li $v0, 0
+        addi    $s2, $s2, -1
+        BUF_TAG(0)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_0, 1)
+        BUF_APPEND(str_endl, 1)
+        # f:
+        addi    $s2, $s2, 1
+        BUF_TAG(0)
+        move    $s2, $s3
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+        # Reset $s2 after use.
+        PPR
+pa_finish:
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
+        nop
+
+parse_eql_exp:
+        .data
+        str_bne_v0_v1: .asciiz "\tbne\t$v0, $v1, " # 15
+        str_beq_v0_v1: .asciiz "\tbeq\t$v0, $v1, " # 15
+        .text
+        PSR($ra)
+
+        jal     parse_rel_exp
+        nop
+
+        lb      $t0, ($s0)
+        li      $t1, EQUAL
+        beq     $t0, $t1, peql_eql
+        li      $t1, NOT_EQUAL
+        beq     $t0, $t1, peql_neq
+        nop
+        j       peql_finish
+        nop
+
+peql_eql:
+        BUF_APPEND(str_psr_v0, 10)
+        jal     parse_rel_exp
+        addi    $s0, $s0, 1
+        BUF_APPEND(str_lw_v1_sp, 15)
+        BUF_APPEND(str_ppr, 5)
+        # bne $v0, $v1
+        BUF_APPEND(str_bne_v0_v1, 14)
+        BUF_TAG(0)
+        BUF_APPEND(str_endl, 1)
+        # li $v0, 0
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_0, 1)
+        BUF_APPEND(str_endl, 1)
+        # li $v0, 1
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_1, 1)
+        BUF_APPEND(str_endl, 1)
+        # f:
+        BUF_TAG(1)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+        j       peql_finish
+        nop
+
+peql_neq:
+        BUF_APPEND(str_psr_v0, 10)
+        jal     parse_rel_exp
+        addi    $s0, $s0, 1
+        BUF_APPEND(str_lw_v1_sp, 15)
+        BUF_APPEND(str_ppr, 5)
+        # beq $v0, $v1
+        BUF_APPEND(str_beq_v0_v1, 14)
+        BUF_TAG(0)
+        BUF_APPEND(str_endl, 1)
+        # li $v0, 0
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_0, 1)
+        BUF_APPEND(str_endl, 1)
+        # li $v0, 1
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_1, 1)
+        BUF_APPEND(str_endl, 1)
+        # f:
+        BUF_TAG(1)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+        j       peql_finish
+        nop
+
+peql_finish:
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
+        nop
+
+parse_rel_exp:
+        .data
+        str_blt_v1_v0: .asciiz "\tblt\t$v1, $v0, " # 15
+        str_ble_v1_v0: .asciiz "\tble\t$v1, $v0, " # 15
+        str_bgt_v1_v0: .asciiz "\tbgt\t$v1, $v0, " # 15
+        str_bge_v1_v0: .asciiz "\tbge\t$v1, $v0, " # 15
+        .text
+        PSR($ra)
+
+        jal     parse_additive_exp
+        nop
+
+        lb      $t0, ($s0)
+        li      $t1, LESS_THAN
+        beq     $t0, $t1, prel_l
+        li      $t1, LESS_EQUAL
+        beq     $t0, $t1, prel_le
+        li      $t1, GREATER_THAN
+        beq     $t0, $t1, prel_g
+        li      $t1, GREATER_EQUAL
+        beq     $t0, $t1, prel_ge
+        nop
+        j       prel_finish
+        nop
+
+prel_l:
+        BUF_APPEND(str_psr_v0, 10)
+        jal     parse_additive_exp
+        addi    $s0, $s0, 1
+        BUF_APPEND(str_lw_v1_sp, 15)
+        BUF_APPEND(str_ppr, 5)
+        # bge $v1, $v0
+        BUF_APPEND(str_bge_v1_v0, 14)
+        BUF_TAG(0)
+        BUF_APPEND(str_endl, 1)
+        # li $v0, 0
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_0, 1)
+        BUF_APPEND(str_endl, 1)
+        # li $v0, 1
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_1, 1)
+        BUF_APPEND(str_endl, 1)
+        # f:
+        BUF_TAG(1)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+        j       prel_finish
+        nop
+
+prel_le:
+        BUF_APPEND(str_psr_v0, 10)
+        jal     parse_additive_exp
+        addi    $s0, $s0, 1
+        BUF_APPEND(str_lw_v1_sp, 15)
+        BUF_APPEND(str_ppr, 5)
+        # bgt $v1, $v0
+        BUF_APPEND(str_bgt_v1_v0, 14)
+        BUF_TAG(0)
+        BUF_APPEND(str_endl, 1)
+        # li $v0, 0
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_0, 1)
+        BUF_APPEND(str_endl, 1)
+        # li $v0, 1
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_1, 1)
+        BUF_APPEND(str_endl, 1)
+        # f:
+        BUF_TAG(1)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+        j       prel_finish
+        nop
+
+prel_g:
+        BUF_APPEND(str_psr_v0, 10)
+        jal     parse_additive_exp
+        addi    $s0, $s0, 1
+        BUF_APPEND(str_lw_v1_sp, 15)
+        BUF_APPEND(str_ppr, 5)
+        # ble $v1, $v0
+        BUF_APPEND(str_ble_v1_v0, 14)
+        BUF_TAG(0)
+        BUF_APPEND(str_endl, 1)
+        # li $v0, 0
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_0, 1)
+        BUF_APPEND(str_endl, 1)
+        # li $v0, 1
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_1, 1)
+        BUF_APPEND(str_endl, 1)
+        # f:
+        BUF_TAG(1)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+        j       prel_finish
+        nop
+
+prel_ge:
+        BUF_APPEND(str_psr_v0, 10)
+        jal     parse_additive_exp
+        addi    $s0, $s0, 1
+        BUF_APPEND(str_lw_v1_sp, 15)
+        BUF_APPEND(str_ppr, 5)
+        # blt $v1, $v0
+        BUF_APPEND(str_blt_v1_v0, 14)
+        BUF_TAG(0)
+        BUF_APPEND(str_endl, 1)
+        # li $v0, 0
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_0, 1)
+        BUF_APPEND(str_endl, 1)
+        # li $v0, 1
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_1, 1)
+        BUF_APPEND(str_endl, 1)
+        # f:
+        BUF_TAG(1)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+        j       prel_finish
+        nop
+
+prel_finish:
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
+        nop
+
+parse_additive_exp: # always get expr's value into $v0
         PSR($ra)
 
         jal     parse_term
         nop
-        BUF_APPEND(str_psr_v0, 10)
-pe_loop_term:
+pae_loop_term:
         lb      $t0, ($s0)
         li      $t1, PLUS
-        beq     $t0, $t1, pe_plus_term
+        beq     $t0, $t1, pae_plus_term
         li      $t2, MINUS
-        beq     $t0, $t2, pe_minus_term
+        beq     $t0, $t2, pae_minus_term
         nop
-        j       pe_loop_term_finish
+        j       pae_loop_term_finish
         nop
-pe_plus_term:
+pae_plus_term:
+        # PSR($v0)
+        BUF_APPEND(str_psr_v0, 10)
         jal     parse_term
         addi    $s0, $s0, 1
         .data
-        str_lw_v1: .asciiz "\tlw\t$v1, ($sp)\n" # 15
+        str_lw_v1_sp: .asciiz "\tlw\t$v1, ($sp)\n" # 15
         str_addu_v0_v1: .asciiz "\taddu\t$v0, $v1, $v0\n" # 20
         str_subu_v1_v0: .asciiz "\tsubu\t$v0, $v1, $v0\n" # 20
         str_ppr: .asciiz "\tPPR\n" # 5
         .text
         # lw $v1, ($sp)
-        BUF_APPEND(str_lw_v1, 15)
+        BUF_APPEND(str_lw_v1_sp, 15)
         # PPR
         BUF_APPEND(str_ppr, 5)
         # addu $v0, $v1, $v0
         BUF_APPEND(str_addu_v0_v1, 20)
+        j       pae_loop_term 
+        nop
+pae_minus_term:
         # PSR($v0)
         BUF_APPEND(str_psr_v0, 10)
-        j       pe_loop_term
-        nop
-pe_minus_term:
         jal     parse_term
         addi    $s0, $s0, 1
         # lw $v1, ($sp)
-        BUF_APPEND(str_lw_v1, 15)
+        BUF_APPEND(str_lw_v1_sp, 15)
         # PPR
         BUF_APPEND(str_ppr, 5)
         # subu $v0, $v1, $v0
         BUF_APPEND(str_subu_v1_v0, 20)
-        # PSR($v0)
-        BUF_APPEND(str_psr_v0, 10)
-        j       pe_loop_term
+        j       pae_loop_term 
         nop
-pe_loop_term_finish:
-        .data
-        str_lw_v0: .asciiz "\tlw\t$v0, ($sp)\n" # 15
-        .text
-        # lw $v0, ($sp)
-        BUF_APPEND(str_lw_v0, 15)
-        # PPR
-        BUF_APPEND(str_ppr, 5)
-
+pae_loop_term_finish:
         lw      $ra, ($sp)
         PPR
         jr      $ra
@@ -720,7 +1063,6 @@ parse_term:
 
         jal     parse_fact
         nop
-        BUF_APPEND(str_psr_v0, 10)
 pt_loop_fact:
         lb      $t0, ($s0)
         li      $t1, TMULT
@@ -734,40 +1076,35 @@ pt_mult_fact:
         .data
         str_mul_v0_v1: .asciiz "\tmul\t$v0, $v1, $v0\n" # 19
         .text
+        # PSR($v0)
+        BUF_APPEND(str_psr_v0, 10)
         jal     parse_fact
         addi    $s0, $s0, 1
         # lw $v1, ($sp)
-        BUF_APPEND(str_lw_v1, 15)
+        BUF_APPEND(str_lw_v1_sp, 15)
         # PPR
         BUF_APPEND(str_ppr, 5)
         # mul $v0, $v1, $v0
         BUF_APPEND(str_mul_v0_v1, 19)
-        # PSR($v0)
-        BUF_APPEND(str_psr_v0, 10)
         j       pt_loop_fact
         nop
 pt_div_fact:
         .data
         str_div_v1_v0: .asciiz "\tdiv\t$v0, $v1, $v0\n" # 19
         .text
+        # PSR($v0)
+        BUF_APPEND(str_psr_v0, 10)
         jal     parse_fact
         addi    $s0, $s0, 1
         # lw $v1, ($sp)
-        BUF_APPEND(str_lw_v1, 15)
+        BUF_APPEND(str_lw_v1_sp, 15)
         # PPR
         BUF_APPEND(str_ppr, 5)
         # div $v0, $v1, $v0
         BUF_APPEND(str_div_v1_v0, 19)
-        # PSR($v0)
-        BUF_APPEND(str_psr_v0, 10)
         j       pt_loop_fact
         nop
 pt_loop_fact_finish:
-        # lw $v0, ($sp)
-        BUF_APPEND(str_lw_v0, 15)
-        # PPR
-        BUF_APPEND(str_ppr, 5)
-
         lw      $ra, ($sp)
         PPR
         jr      $ra
@@ -791,7 +1128,7 @@ parse_fact:
         nop
 
 pf_more_expr:
-        jal     parse_expr
+        jal     parse_exp
         addi    $s0, $s0, 1
 
         addi    $s0, $s0, 1
@@ -830,7 +1167,7 @@ pf_bit_compl:
         .data
         str_xori_f: .asciiz "\txori\t$v0, $v0, 0xffffffff\n" # 27
         .text
-        jal     parse_expr  # Get sub-expr's value in $v0
+        jal      parse_fact      # Get sub-expr's value in $v0
         addi    $s0, $s0, 1
         BUF_APPEND(str_xori_f, 27)
         j       pf_finish
@@ -840,7 +1177,7 @@ pf_minus:
         .data
         str_subu_v0: .asciiz "\tsubu\t$v0, $0, $v0\n" # 19
         .text
-        jal     parse_expr  # Get sub-expr's value in $v0
+        jal      parse_fact # Get sub-expr's value in $v0
         addi    $s0, $s0, 1
         BUF_APPEND(str_subu_v0, 19)
         j       pf_finish
@@ -853,7 +1190,7 @@ pf_negation:
         str_char_1:  .asciiz "1"
         str_move_v0_v1: .asciiz "\tmove\t$v0, $v1\n" # 15
         .text
-        jal     parse_expr  # Get sub-expr's value in $v0
+        jal      parse_fact # Get sub-expr's value in $v0
         addi    $s0, $s0, 1
         # li   $v1, 1
         BUF_APPEND(str_pre_li_v1, 9)
@@ -870,7 +1207,7 @@ pf_negation:
         BUF_APPEND(str_char_0, 1)
         BUF_APPEND(str_endl, 1)
         # eqz:
-        BUF_TAG(0)
+        BUF_TAG(1)
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
         # move $v0, $v1

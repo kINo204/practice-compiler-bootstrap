@@ -11,10 +11,26 @@
         ;
 
 <statement>
-        : keyword_return <expr> semicolon
+        : keyword_return <exp> semicolon
         ;
 
-<expr>
+<exp>
+        : <logical-and-exp> { "||" <logical-and-exp> }
+        ;
+
+<logical-and-exp>
+        : <equality-exp> { "&&" <equality-exp> }
+        ;
+
+<equality-exp>
+        : <relational-exp> [ ("!=" | "==") <relational-exp> ]
+        ;
+
+<relational-exp>
+        : <additive-exp> [ ("<" | ">" | "<=" | ">=") <additive-exp> ]
+        ;
+
+<additive_exp>
         : <term> { ("+" | "-") <term> }
         ;
 
@@ -23,7 +39,7 @@
         ;
 
 <factor>
-        : open_par <expr> close_par
+        : open_par <exp> close_par
         | <unary_op> <factor>
         | <literal> 
         ;
