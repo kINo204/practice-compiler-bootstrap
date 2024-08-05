@@ -5,35 +5,27 @@ ENTRY
 .globl main
 main:
 	PSR($ra)
-	li	$v0, 1
+	PSR($fp)
+	move	$fp, $sp
+	addi	$sp, $sp, -4
+	addi	$sp, $sp, -4
+	li	$v0, 2
+	sw	$v0, -0x00000008($fp)
+	sw	$v0, -0x00000004($fp)
+	lw	$v0, -0x00000004($fp)
+	PSR($v0)
+	lw	$v0, -0x00000008($fp)
 	PSR($v0)
 	li	$v0, 2
 	lw	$v1, ($sp)
 	PPR
-	blt	$v1, $v0,AAAA
-	li	$v0, 0
-	li	$v0, 1
-AAAA:
-	beqz	$v0, AAAB
-	nop
-	li	$v0, 2
-	PSR($v0)
-	li	$v0, 5
+	mul	$v0, $v1, $v0
 	lw	$v1, ($sp)
 	PPR
-	beq	$v0, $v1,AAAD
-	li	$v0, 0
-	li	$v0, 1
-AAAD:
-	beqz	$v0, AAAB
-	nop
-	li	$v0, 4
-	beqz	$v0, AAAB
-	nop
-	j	AAAC
-	li	$v0, 1
-AAAB:	li	$v0, 0
-AAAC:
+	addu	$v0, $v1, $v0
+	move	$sp, $fp
+	lw	$fp, ($sp)
+	PPR
 	lw	$ra, ($sp)
 	PPR
 	jr	$ra

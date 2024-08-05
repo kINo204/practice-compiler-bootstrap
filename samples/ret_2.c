@@ -1,3 +1,6 @@
 int main() {
-    return ((1 >= 2) && (2 != 5) && 4);
+    int a;
+    int b;
+    a = b = 2;
+    return a + b * 2;
 }

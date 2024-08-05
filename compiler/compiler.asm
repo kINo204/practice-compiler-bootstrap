@@ -492,18 +492,16 @@ tokenize_finish:
         sb      $t0, ($s1)
 
 
-        ############
-        ## Parser ##
-        ############
-
-        # Init:
+############
+## Parser ##
+############
+# Macro utils
 .macro BUF_APPEND(%a_str, %i_len)
         la      $a0, %a_str
         li      $a1, %i_len
         jal     write_buf
         nop
 .end_macro
-
 .macro BUF_TAG(%i_inc)
         srl     $t1, $s2, 24
         andi    $t1, $t1, 0xff
@@ -528,20 +526,39 @@ tokenize_finish:
 
         addi    $s2, $s2, %i_inc
 .end_macro
+# On entering(when parsing) a new var_scope, call this.
+.macro STBL_PUSH
+        PSR($s3)
+        move    $s3, $s4
+.end_macro
+# On exiting(when parsing) a new var_scope, call this.
+.macro STBL_POP
+        move    $s4, $s3
+        lw      $s3, ($sp)
+        PPR
+.end_macro
 
-.eqv    LOUTBUF 500
+# Init:
+.eqv    LOUTBUF 1000
         SBRK(LOUTBUF)
         PSR($v0) # output_buffer_base
+.eqv    LSYMTBL 1000
+        SBRK(LSYMTBL)
+        PSR($v0) # symbol_table_base
 
-        lw      $s0, 4($sp)  # $s0: token_list_index
-        lw      $s1, 0($sp)  # $s1: output_buffer_index
+        lw      $s0, 8($sp)  # $s0: token_list_index
+        lw      $s1, 4($sp)  # $s1: output_buffer_index
         li      $s2, 0       # $s2: tag_cnt (auto, don't occupy!)
+        lw      $s3, 0($sp)  # $s3: stbl_base
+        move    $s4, $s3     # $s4: stbl_top
+        li      $s5, 0       # $s5: cur_stack_ind
 
         BUF_APPEND(str_include_lib, 26) # Add include statement.
         BUF_APPEND(str_sysent, 7) # Add system entry.
         j       parse_program
         nop
 
+# Function utils
 write_buf: # $a0: addr_str, $a1: strlen
         .data
         str_comma: .asciiz ":"
@@ -549,9 +566,8 @@ write_buf: # $a0: addr_str, $a1: strlen
         str_space: .asciiz " "
         str_nop:   .asciiz "\tnop\n" # 5
         .text
-
         PSR($ra)
-loop_wb:
+        loop_wb:
         # Copy a byte:
         lb      $t0, ($a0)
         sb      $t0, ($s1)
@@ -560,22 +576,204 @@ loop_wb:
         addi    $a1, $a1, -1
         bnez    $a1, loop_wb
         addi    $s1, $s1, 1
-# loop end
+        # loop end
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
+        nop
+
+write_buf_uint: # $a0 = uint
+        PSR($ra)
+
+        li      $t0, '0'
+        sb      $t0, 0($s1)
+        li      $t0, 'x'
+        sb      $t0, 1($s1)
+
+        li      $t1, 10
+
+        srl     $t0, $a0, 28
+        andi    $t0, $t0, 0xf
+        bge     $t0, $t1, _0ge
+        nop
+        j       f0
+        addi    $t0, $t0, 48
+        _0ge:
+        addi    $t0, $t0, 87
+        f0:
+        sb      $t0, 2($s1)
+
+        srl     $t0, $a0, 24
+        andi    $t0, $t0, 0xf
+        bge     $t0, $t1, _1ge
+        nop
+        j       f1
+        addi    $t0, $t0, 48
+        _1ge:
+        addi    $t0, $t0, 87
+        f1:
+        sb      $t0, 3($s1)
+
+        srl     $t0, $a0, 20
+        andi    $t0, $t0, 0xf
+        bge     $t0, $t1, _2ge
+        nop
+        j       f2
+        addi    $t0, $t0, 48
+        _2ge:
+        addi    $t0, $t0, 87
+        f2:
+        sb      $t0, 4($s1)
+
+        srl     $t0, $a0, 16
+        andi    $t0, $t0, 0xf
+        bge     $t0, $t1, _3ge
+        nop
+        j       f3
+        addi    $t0, $t0, 48
+        _3ge:
+        addi    $t0, $t0, 87
+        f3:
+        sb      $t0, 5($s1)
+
+        srl     $t0, $a0, 12
+        andi    $t0, $t0, 0xf
+        bge     $t0, $t1, _4ge
+        nop
+        j       f4
+        addi    $t0, $t0, 48
+        _4ge:
+        addi    $t0, $t0, 87
+        f4:
+        sb      $t0, 6($s1)
+
+        srl     $t0, $a0, 8
+        andi    $t0, $t0, 0xf
+        bge     $t0, $t1, _5ge
+        nop
+        j       f5
+        addi    $t0, $t0, 48
+        _5ge:
+        addi    $t0, $t0, 87
+        f5:
+        sb      $t0, 7($s1)
+
+        srl     $t0, $a0, 4
+        andi    $t0, $t0, 0xf
+        bge     $t0, $t1, _6ge
+        nop
+        j       f6
+        addi    $t0, $t0, 48
+        _6ge:
+        addi    $t0, $t0, 87
+        f6:
+        sb      $t0, 8($s1)
+
+        andi    $t0, $a0, 0xf
+        bge     $t0, $t1, _7ge
+        nop
+        j       f7
+        addi    $t0, $t0, 48
+        _7ge:
+        addi    $t0, $t0, 87
+        f7:
+        sb      $t0, 9($s1)
+
+        addi    $s1, $s1, 10
 
         lw      $ra, ($sp)
         PPR
         jr      $ra
         nop
 
+sym_add: # $a0 = var_size, $a1 = token_base
+        PSR($ra)
+
+        addi    $a1, $a1, 1
+        lb      $a2, ($a1) # $a2 = ident_len
+        addi    $a1, $a1, 1 # $a1 = ident_src
+
+        addu    $s5, $s5, $a0
+        sb      $s5, 0($s4) # stack_ofs
+        sb      $a2, 1($s4) # ident_len
+        addi    $s4, $s4, 2
+
+        li      $t0, 0
+        sa_loop:
+        lb      $t1, ($a1)
+        sb      $t1, ($s4)
+        addi    $a1, $a1, 1
+        addi    $s4, $s4, 1
+        addi    $t0, $t0, 1
+        bne     $t0, $a2, sa_loop
+        nop
+
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
+        nop
+
+sym_search: # $a0 = token_base, $v0 := sym_stack_index
+        PSR($ra)
+
+        move    $t0, $s3 # current symbol table search index
+        lb      $a1, 1($a0) # ident_len expected
+        addi    $a0, $a0, 2 # ident_base expected
+        ssch_loop_entry:
+        beq     $t0, $s4, sym_not_found
+        lb      $t1, 1($t0) # ident_len
+        beq     $t1, $a1, ssch_le_same_len
+        nop
+        # continue next loop:
+        addi    $t0, $t0, 2
+        addu    $t0, $t0, $t1
+        j       ssch_loop_entry
+        nop
+        ssch_le_same_len:
+        li      $t1, 0 # loop ind
+        addi    $t2, $t0, 2 # ident_ind
+        move    $t3, $a0    # ident_expected_ind
+        ssch_loop_char:
+        lb      $t4, ($t2)
+        lb      $t5, ($t3)
+        beq     $t4, $t5, ssch_lc_same_char
+        nop
+        # continue next loop:
+        addi    $t0, $t0, 2
+        addu    $t0, $t0, $a1
+        j       ssch_loop_entry
+        nop
+        ssch_lc_same_char:
+        addi    $t2, $t2, 1
+        addi    $t3, $t3, 1
+        addi    $t1, $t1, 1
+        bne     $a1, $t1, ssch_loop_char
+        nop
+
+        j       ssch_finish
+        lb      $v0, ($t0) # return val
+        sym_not_found:
+        PRINTLN_STR(str_sym_not_found, "Parsing error: symbol not found!")
+
+        ssch_finish:
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
+        nop
+
+# Parser components
 parse_func_def:
         .data
         str_textseg: .asciiz ".text\n" # 6
         str_globl: .asciiz ".globl " # 7
         str_psra:  .asciiz "\tPSR($ra)\n" # 10
         str_ppra:  .asciiz "\tlw\t$ra, ($sp)\n\tPPR\n" # 20
+        str_psfp:  .asciiz "\tPSR($fp)\n\tmove\t$fp, $sp\n" # 25
         .text
 
         PSR($ra)
+
+        STBL_PUSH
 
         # Print function head infos:
         # """
@@ -583,30 +781,34 @@ parse_func_def:
         # .globl func_name
         # func_name:
         #       PSR($ra)
+        #       PSR($fp)
+        #       move $fp, $sp
         # """
+        li      $s5, 0 # reset local var stack ofs
         BUF_APPEND(str_textseg, 6)
         BUF_APPEND(str_globl, 7)
         addi    $s0, $s0, 2
-        lb      $s3, ($s0) # $s3: ident_length
+        lb      $s6, ($s0) # $s6: ident_length
         addi    $s0, $s0, 1
-        move    $s4, $s0   # $s4 addr_ident
+        move    $s7, $s0   # $s7: addr_ident
 
         # Print ident.
-        move    $a0, $s4
-        move    $a1, $s3
+        move    $a0, $s7
+        move    $a1, $s6
         jal     write_buf
         nop
         BUF_APPEND(str_endl, 1)
         # Print ident.
-        move    $a0, $s4
-        move    $a1, $s3
+        move    $a0, $s7
+        move    $a1, $s6
         jal     write_buf
         nop
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_psra, 10)
+        BUF_APPEND(str_psfp, 25)
 
-        addu    $s0, $s0, $s3 # $s0 on "open_par"
+        addu    $s0, $s0, $s6 # $s0 on "open_par"
         addi    $s0, $s0, 3
 
 pfd_loop:
@@ -624,6 +826,8 @@ pfd_finish:
         addi    $s0, $s0, 1 # Jump the "close_brac"
         BUF_APPEND(str_endl, 1)
 
+        STBL_POP
+
         lw      $ra, ($sp)
         PPR
         jr      $ra
@@ -634,20 +838,104 @@ parse_type:
 parse_statement:
         .data
         str_jr: .asciiz "\tjr\t$ra\n\tnop\n" # 13
+        str_ppfp: .asciiz "\tmove\t$sp, $fp\n\tlw\t$fp, ($sp)\n\tPPR\n" # 35
         .text
         PSR($ra)
 
-        # Return statement:
+        lb      $t0, ($s0)
+        li      $t1, KEYWORD_RETURN
+        beq     $t0, $t1, ps_return
+        li      $t1, KEYWORD_INT
+        beq     $t0, $t1, ps_decl_int
+        nop
+
+ps_bare_exp: 
+        jal     parse_exp
+        nop
+        j       ps_finish
+        addi    $s0, $s0, 1 # jump semicolon
+
+ps_decl_int:
+        .data
+        str_sp_minus4: .asciiz "\taddi\t$sp, $sp, -4\n" # 19
+        .text
+        # Add symbol: ident.
+        li      $a0, 4
+        jal     sym_add
+        addi    $a1, $s0, 1
+        # addi  $sp, $sp, -4
+        BUF_APPEND(str_sp_minus4, 19)
+        lb      $t0, 2($s0)
+        addi    $s0, $s0, 3
+        addu    $s0, $s0, $t0
+        j       ps_finish
+        addi    $s0, $s0, 1 # jump ";"
+
+ps_return:
         jal     parse_exp
         addi    $s0, $s0, 1 # jump keyword_return (before )parse_exp
         addi    $s0, $s0, 1 # jump semicolon
+        BUF_APPEND(str_ppfp, 35)
         BUF_APPEND(str_ppra, 20)
         BUF_APPEND(str_jr, 13)
+        j       ps_finish
+        nop
 
+ps_finish:
         lw      $ra, ($sp)
         PPR
         jr      $ra
         nop
+
+parse_exp:
+        PSR($ra)
+
+        lb      $t0, ($s0)
+        li      $t1, IDENT
+        bne     $t0, $t1, pe_or_exp
+        nop
+
+        lb      $t0, 1($s0)
+        addu    $t0, $s0, $t0
+        addi    $t0, $t0, 2
+        lb      $t2, ($t0)
+        li      $t1, ASSIGN
+        beq     $t2, $t1, pe_assign
+        nop
+
+pe_or_exp:
+        jal     parse_or_exp
+        nop
+        j       pe_finish
+        nop
+
+pe_assign:
+        .data
+        str_pre_sw_v0_minus: .asciiz "\tsw\t$v0, -" # 10
+        str_post_sw_v0_minus: .asciiz "($fp)\n" # 6
+        str_pre_lw_v0_minus: .asciiz "\tlw\t$v0, -" # 10
+        str_post_lw_v0_minus: .asciiz "($fp)\n" # 6
+        .text
+        PSR($s0)
+        jal     parse_exp
+        addi    $s0, $t0, 1
+
+        # sw    $v0, -st_ofs($fp)
+        BUF_APPEND(str_pre_sw_v0_minus, 10)
+        lw      $a0, ($sp)
+        PPR
+        jal     sym_search
+        nop
+        jal     write_buf_uint
+        move    $a0, $v0
+        BUF_APPEND(str_post_sw_v0_minus, 6)
+
+pe_finish:
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
+        nop
+
 
         .data
         str_pre_li_v0: .asciiz "\tli\t$v0, " # 9
@@ -655,7 +943,7 @@ parse_statement:
         str_psr_v0: .asciiz "\tPSR($v0)\n" # 10
         str_lw_v0_sp: .asciiz "\tlw\t$v0, ($sp)\n" # 15
         .text
-parse_exp:
+parse_or_exp:
         .data
         str_pre_bnez_v0: .asciiz "\tbnez\t$v0, " # 11
         .text
@@ -665,42 +953,42 @@ parse_exp:
 
         li      $t1, TOR        # Check for "||" token;
         lb      $t0, ($s0)
-        bne     $t0, $t1, pe_finish
+        bne     $t0, $t1, poe_finish
         nop
 # Contains token "||":
         PSR($s2) # tags: f1, f
         addi    $s2, $s2, 2
 
         BUF_APPEND(str_pre_bnez_v0, 11) # bnez $v0, f1
-        move    $s3, $s2
+        move    $s6, $s2
         lw      $s2, ($sp)
         BUF_TAG(0)
-        move    $s2, $s3
+        move    $s2, $s6
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_nop, 5) # nop
-pe_loop:
+poe_loop:
         jal     parse_and_exp   # Parse next and exp;
         addi    $s0, $s0, 1
         BUF_APPEND(str_pre_bnez_v0, 11) # bnez $v0, f1
-        move    $s3, $s2
+        move    $s6, $s2
         lw      $s2, ($sp)
         BUF_TAG(0)
-        move    $s2, $s3
+        move    $s2, $s6
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_nop, 5) # nop
         li      $t1, TOR        # Check for "||" token;
         lb      $t0, ($s0)
-        bne     $t0, $t1, pe_gen
+        bne     $t0, $t1, poe_gen
         nop
-        j       pe_loop         # Loop back.
+        j       poe_loop         # Loop back.
         nop
-pe_gen:
+poe_gen:
         .data
         str_pre_jump: .asciiz "\tj\t" # 3
         .text
         # j f
         BUF_APPEND(str_pre_jump, 3)
-        move    $s3, $s2
+        move    $s6, $s2
         lw      $s2, ($sp)
         addi    $s2, $s2, 1
         BUF_TAG(0)
@@ -719,13 +1007,13 @@ pe_gen:
         # f:
         addi    $s2, $s2, 1
         BUF_TAG(0)
-        move    $s2, $s3
+        move    $s2, $s6
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
 
         # PPR $s2 after use.
         PPR
-pe_finish:
+poe_finish:
         lw      $ra, ($sp)
         PPR
         jr      $ra
@@ -745,20 +1033,20 @@ parse_and_exp:
         addi    $s2, $s2, 2
 
         BUF_APPEND(str_pre_beqz_v0, 11) # beqz $v0, f0
-        move    $s3, $s2
+        move    $s6, $s2
         lw      $s2, ($sp)
         BUF_TAG(0)
-        move    $s2, $s3
+        move    $s2, $s6
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_nop, 5) # nop
 pa_loop:
         jal     parse_eql_exp   # Parse next eql exp;
         addi    $s0, $s0, 1
         BUF_APPEND(str_pre_beqz_v0, 11) # beqz $v0, f0
-        move    $s3, $s2
+        move    $s6, $s2
         lw      $s2, ($sp)
         BUF_TAG(0)
-        move    $s2, $s3
+        move    $s2, $s6
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_nop, 5) # nop
         li      $t1, TAND       # Check for "&& token;
@@ -770,7 +1058,7 @@ pa_loop:
 pa_gen:
         # j f
         BUF_APPEND(str_pre_jump, 3)
-        move    $s3, $s2
+        move    $s6, $s2
         lw      $s2, ($sp)
         addi    $s2, $s2, 1
         BUF_TAG(0)
@@ -789,7 +1077,7 @@ pa_gen:
         # f:
         addi    $s2, $s2, 1
         BUF_TAG(0)
-        move    $s2, $s3
+        move    $s2, $s6
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
         # Reset $s2 after use.
@@ -1113,6 +1401,8 @@ pt_loop_fact_finish:
 parse_fact:
         PSR($ra)
         lb      $t0, ($s0)
+        li      $t1, IDENT
+        beq     $t0, $t1, pf_ident
         li      $t1, OPEN_PAR
         beq     $t0, $t1, pf_more_expr
         li      $t1, LITERAL_INT
@@ -1125,6 +1415,23 @@ parse_fact:
         beq     $t0, $t1, pf_minus
         li      $t1, NEGATION
         beq     $t0, $t1, pf_negation
+        nop
+
+pf_ident:
+        # lw    $v0, -st_ofs($fp)
+        BUF_APPEND(str_pre_lw_v0_minus, 10)
+        move    $a0, $s0
+        jal     sym_search
+        nop
+        jal     write_buf_uint
+        move    $a0, $v0
+        BUF_APPEND(str_post_lw_v0_minus, 6)
+        addi    $s0, $s0, 1
+        lb      $t0, ($s0)
+        addi    $s0, $s0, 1
+        addu    $s0, $s0, $t0
+
+        j       pf_finish
         nop
 
 pf_more_expr:
@@ -1239,7 +1546,7 @@ parse_finish:
         PRINTLN_STR(str_parser_finish, "Parsing finished.")
 
         OPEN(fname_dst, 1, 0) # Write output file.
-        lw      $t0, ($sp) # output_buf_base
+        lw      $t0, 4($sp) # output_buf_base
         subu    $t1, $s1, $t0 # output_buf_len
         WRITE($v0, $t0, $t1)
 

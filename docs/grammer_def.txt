@@ -3,18 +3,30 @@
         ;
 
 <func_def>
-        : <func_type> ident open_par close_par open_brac <statement> close_brac
+        : <func_type> ident open_par close_par open_brac { <statement> } close_brac
         ;
 
 <func_type>
+        : <var_type>
+        | keyword_void
+        ;
+
+<var_type>
         : keyword_int
         ;
 
 <statement>
-        : keyword_return <exp> semicolon
+        : <exp> semicolon
+        | keyword_return <exp> semicolon
+        | <var_type> ident semicolon
         ;
 
 <exp>
+        : ident assign <exp>
+        | <logical-or-exp>
+        ;
+
+<logical-or-exp>
         : <logical-and-exp> { "||" <logical-and-exp> }
         ;
 
@@ -42,6 +54,7 @@
         : open_par <exp> close_par
         | <unary_op> <factor>
         | <literal> 
+        | ident
         ;
 
 <unary_op>

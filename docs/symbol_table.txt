@@ -1,0 +1,18 @@
+SymbolTable
+{
+    SymbolTableEntry
+    {
+        byte: symbol_stack_index
+        byte: ident_len
+        bytes: ident
+    }
+}
+
+reserved regs:
+
+
+methods:
+stbl_push
+stbl_pop
+sym_push
+sym_search_id
