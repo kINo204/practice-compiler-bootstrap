@@ -552,6 +552,7 @@ tokenize_finish:
         lw      $s3, 0($sp)  # $s3: stbl_base
         move    $s4, $s3     # $s4: stbl_top
         li      $s5, 0       # $s5: cur_stack_ind
+        li      $s6, 0       # $s6: stbl_search_entry_sp
 
         BUF_APPEND(str_include_lib, 26) # Add include statement.
         BUF_APPEND(str_sysent, 7) # Add system entry.
@@ -716,9 +717,9 @@ sym_add: # $a0 = var_size, $a1 = token_base
 sym_search: # $a0 = token_base, $v0 := sym_stack_index
         PSR($ra)
 
-        move    $t0, $s3 # current symbol table search index
         lb      $a1, 1($a0) # ident_len expected
         addi    $a0, $a0, 2 # ident_base expected
+        move    $t0, $s3 # current symbol table search index
         ssch_loop_entry:
         beq     $t0, $s4, sym_not_found
         lb      $t1, 1($t0) # ident_len
@@ -788,19 +789,19 @@ parse_func_def:
         BUF_APPEND(str_textseg, 6)
         BUF_APPEND(str_globl, 7)
         addi    $s0, $s0, 2
-        lb      $s6, ($s0) # $s6: ident_length
-        addi    $s0, $s0, 1
-        move    $s7, $s0   # $s7: addr_ident
+        lb      $a1, ($s0) # ident_length
+        addi    $s0, $s0, 1 # addr_ident
+        move    $a0, $s0
+        PSR($a0)
+        PSR($a1)
 
         # Print ident.
-        move    $a0, $s7
-        move    $a1, $s6
         jal     write_buf
         nop
         BUF_APPEND(str_endl, 1)
         # Print ident.
-        move    $a0, $s7
-        move    $a1, $s6
+        lw      $a0, 4($sp)
+        lw      $a1, 0($sp)
         jal     write_buf
         nop
         BUF_APPEND(str_comma, 1)
@@ -808,8 +809,11 @@ parse_func_def:
         BUF_APPEND(str_psra, 10)
         BUF_APPEND(str_psfp, 25)
 
-        addu    $s0, $s0, $s6 # $s0 on "open_par"
+        lw      $a1, 0($sp)
+        addu    $s0, $s0, $a1 # $s0 on "open_par"
         addi    $s0, $s0, 3
+        PPR
+        PPR
 
 pfd_loop:
         lb      $t0, ($s0)
@@ -960,20 +964,22 @@ parse_or_exp:
         addi    $s2, $s2, 2
 
         BUF_APPEND(str_pre_bnez_v0, 11) # bnez $v0, f1
-        move    $s6, $s2
-        lw      $s2, ($sp)
+        PSR($s2)
+        lw      $s2, 4($sp)
         BUF_TAG(0)
-        move    $s2, $s6
+        lw      $s2, 0($sp)
+        PPR
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_nop, 5) # nop
 poe_loop:
         jal     parse_and_exp   # Parse next and exp;
         addi    $s0, $s0, 1
         BUF_APPEND(str_pre_bnez_v0, 11) # bnez $v0, f1
-        move    $s6, $s2
-        lw      $s2, ($sp)
+        PSR($s2)
+        lw      $s2, 4($sp)
         BUF_TAG(0)
-        move    $s2, $s6
+        lw      $s2, 0($sp)
+        PPR
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_nop, 5) # nop
         li      $t1, TOR        # Check for "||" token;
@@ -988,8 +994,8 @@ poe_gen:
         .text
         # j f
         BUF_APPEND(str_pre_jump, 3)
-        move    $s6, $s2
-        lw      $s2, ($sp)
+        PSR($s2)
+        lw      $s2, 4($sp)
         addi    $s2, $s2, 1
         BUF_TAG(0)
         BUF_APPEND(str_endl, 1)
@@ -1007,7 +1013,8 @@ poe_gen:
         # f:
         addi    $s2, $s2, 1
         BUF_TAG(0)
-        move    $s2, $s6
+        lw      $s2, 0($sp)
+        PPR
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
 
@@ -1033,20 +1040,22 @@ parse_and_exp:
         addi    $s2, $s2, 2
 
         BUF_APPEND(str_pre_beqz_v0, 11) # beqz $v0, f0
-        move    $s6, $s2
-        lw      $s2, ($sp)
+        PSR($s2)
+        lw      $s2, 4($sp)
         BUF_TAG(0)
-        move    $s2, $s6
+        lw      $s2, 0($sp)
+        PPR
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_nop, 5) # nop
 pa_loop:
         jal     parse_eql_exp   # Parse next eql exp;
         addi    $s0, $s0, 1
         BUF_APPEND(str_pre_beqz_v0, 11) # beqz $v0, f0
-        move    $s6, $s2
-        lw      $s2, ($sp)
+        PSR($s2)
+        lw      $s2, 4($sp)
         BUF_TAG(0)
-        move    $s2, $s6
+        lw      $s2, 0($sp)
+        PPR
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_nop, 5) # nop
         li      $t1, TAND       # Check for "&& token;
@@ -1058,8 +1067,8 @@ pa_loop:
 pa_gen:
         # j f
         BUF_APPEND(str_pre_jump, 3)
-        move    $s6, $s2
-        lw      $s2, ($sp)
+        PSR($s2)
+        lw      $s2, 4($sp)
         addi    $s2, $s2, 1
         BUF_TAG(0)
         BUF_APPEND(str_endl, 1)
@@ -1077,7 +1086,8 @@ pa_gen:
         # f:
         addi    $s2, $s2, 1
         BUF_TAG(0)
-        move    $s2, $s6
+        lw      $s2, 0($sp)
+        PPR
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
         # Reset $s2 after use.

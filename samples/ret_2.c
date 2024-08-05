@@ -3,5 +3,11 @@ int main() {
     int b;
     a = 4;
     b = 2;
-    return (a + 5) / b;
+    return (a + b) * 4;
+}
+
+int func() {
+    int a;
+    a = 3;
+    return 4;
 }
