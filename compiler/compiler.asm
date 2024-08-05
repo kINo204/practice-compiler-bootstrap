@@ -8,7 +8,7 @@ str_sysent: .asciiz "ENTRY\n\n"
 
 .text
         # Alloc file input buffer.
-.eqv    LINBUF  100 # max bytes
+.eqv    LINBUF  1000 # max bytes
         SBRK(LINBUF)
         PSR($v0) # input_buffer_base
 
@@ -23,7 +23,7 @@ str_sysent: .asciiz "ENTRY\n\n"
         CLOSE($s0)
 
         # Create token list.
-.eqv    LTOKENS 50 # token list
+.eqv    LTOKENS 1000 # token list
         SBRK(LTOKENS)
         PSR($v0) # token_list_base
         
@@ -539,7 +539,7 @@ tokenize_finish:
 .end_macro
 
 # Init:
-.eqv    LOUTBUF 1000
+.eqv    LOUTBUF 3000
         SBRK(LOUTBUF)
         PSR($v0) # output_buffer_base
 .eqv    LSYMTBL 1000
