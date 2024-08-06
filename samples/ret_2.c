@@ -1,13 +1,11 @@
 int main() {
     int a;
+    a = 2;
+    {
+        int a;
+        a = 66;
+    }
     int b;
-    a = 4;
-    b = 2;
-    return (1 + b) * 4;
-}
-
-int func() {
-    int a;
-    a = 3;
-    return 4;
+    b = 4;
+    return a + b;
 }

@@ -17,8 +17,13 @@
 
 <statement>
         : <exp> semicolon
+        | <block>
         | keyword_return <exp> semicolon
         | <var_type> ident semicolon
+        ;
+
+<block>
+        : open_brac { <statement> } close_brac
         ;
 
 <exp>

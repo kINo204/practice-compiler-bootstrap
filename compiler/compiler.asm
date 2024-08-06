@@ -896,6 +896,8 @@ parse_statement:
         beq     $t0, $t1, ps_return
         li      $t1, KEYWORD_INT
         beq     $t0, $t1, ps_decl_int
+        li      $t1, OPEN_BRAC
+        beq     $t0, $t1, ps_block
         nop
 
 ps_bare_exp: 
@@ -903,6 +905,20 @@ ps_bare_exp:
         nop
         j       ps_finish
         addi    $s0, $s0, 1 # jump semicolon
+
+ps_block:
+        addi    $s0, $s0, 1 # jump {
+        STBL_BLK
+        ps_block_loop_statement:
+        jal     parse_statement
+        nop
+        lb      $t0, ($s0)
+        li      $t1, CLOSE_BRAC
+        bne     $t0, $t1, ps_block_loop_statement
+        nop
+        STBL_UNBLK
+        j       ps_finish
+        addi    $s0, $s0, 1 # jump }
 
 ps_decl_int:
         .data
