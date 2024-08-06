@@ -7,10 +7,11 @@ str_include_lib: .asciiz ".include \"../lib/lib.asm\"\n" # 26
 str_sysent: .asciiz "ENTRY\n\n"
 
 .text
+        move    $gp, $sp
         # Alloc file input buffer.
 .eqv    LINBUF  1000 # max bytes
         SBRK(LINBUF)
-        PSR($v0) # input_buffer_base
+        PSR($v0) # input_buffer_base fpofs = -4
 
         # Read the source code file.
         OPEN(fname_src, 0, 0)
@@ -18,14 +19,14 @@ str_sysent: .asciiz "ENTRY\n\n"
 
         lw      $s1, ($sp) # input_buffer_base
         READ($s0, $s1, LINBUF)
-        PSR($v0) # input_len
+        PSR($v0) # input_len fpofs = -8
 
         CLOSE($s0)
 
         # Create token list.
 .eqv    LTOKENS 1000 # token list
         SBRK(LTOKENS)
-        PSR($v0) # token_list_base
+        PSR($v0) # token_list_base fpofs = -0xc
         
 
         #############
@@ -537,22 +538,32 @@ tokenize_finish:
         lw      $s3, ($sp)
         PPR
 .end_macro
+.macro STBL_BLK
+        sw      $s4, ($s6)
+        addi    $s6, $s6, 4
+.end_macro
+.macro STBL_UNBLK
+        addi    $s6, $s6, -4
+.end_macro
 
 # Init:
 .eqv    LOUTBUF 3000
         SBRK(LOUTBUF)
-        PSR($v0) # output_buffer_base
+        PSR($v0) # output_buffer_base fpofs = -0x10
 .eqv    LSYMTBL 1000
         SBRK(LSYMTBL)
-        PSR($v0) # symbol_table_base
+        PSR($v0) # symbol_table_base fpofs = -0x14
+.eqv    LSYMENTSTACK 40
+        SBRK(LSYMENTSTACK)
+        PSR($v0) # symbol_search_entry_stack fpofs = -0x18
 
-        lw      $s0, 8($sp)  # $s0: token_list_index
-        lw      $s1, 4($sp)  # $s1: output_buffer_index
-        li      $s2, 0       # $s2: tag_cnt (auto, don't occupy!)
-        lw      $s3, 0($sp)  # $s3: stbl_base
-        move    $s4, $s3     # $s4: stbl_top
-        li      $s5, 0       # $s5: cur_stack_ind
-        li      $s6, 0       # $s6: stbl_search_entry_sp
+        lw      $s0, -0x0c($gp)  # $s0: token_list_index
+        lw      $s1, -0x10($gp)  # $s1: output_buffer_index
+        li      $s2, 0           # $s2: tag_cnt (auto, don't occupy!)
+        lw      $s3, -0x14($gp)  # $s3: stbl_base
+        move    $s4, $s3         # $s4: stbl_top
+        li      $s5, 0           # $s5: cur_stack_ind
+        lw      $s6, -0x18($gp)  # $s6: stbl_search_entry_sp
 
         BUF_APPEND(str_include_lib, 26) # Add include statement.
         BUF_APPEND(str_sysent, 7) # Add system entry.
@@ -1556,7 +1567,7 @@ parse_finish:
         PRINTLN_STR(str_parser_finish, "Parsing finished.")
 
         OPEN(fname_dst, 1, 0) # Write output file.
-        lw      $t0, 4($sp) # output_buf_base
+        lw      $t0, -0x10($gp) # output_buf_base
         subu    $t1, $s1, $t0 # output_buf_len
         WRITE($v0, $t0, $t1)
 
