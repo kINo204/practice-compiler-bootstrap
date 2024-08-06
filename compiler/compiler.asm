@@ -763,9 +763,8 @@ ss_not_found_loop_char:
         bne     $t0, $t2, ss_not_found_loop_char
         nop
         ENDL
-        lw      $a0, 0($sp)
-        PPR
-        li      $v0, 0
+        EXIT(-1)
+
 ss_finish:
         lw      $s6, ($sp)
         PPR
