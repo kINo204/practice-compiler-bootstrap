@@ -7,15 +7,9 @@ main:
 	PSR($ra)
 	PSR($fp)
 	move	$fp, $sp
-	li	$v0, 2
+	li	$v0, 9
 	PSR($v0)
-	li	$v0, 3
-	sw	$v0, -0x00000004($fp)
-	li	$v0, 4
-	sw	$v0, -0x00000004($fp)
-	li	$v0, 5
-	sw	$v0, -0x00000004($fp)
-	lw	$v0, -0x00000004($fp)
+	lw	$v0, -0x00000000($fp)
 	move	$sp, $fp
 	lw	$fp, ($sp)
 	PPR

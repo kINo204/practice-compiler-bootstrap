@@ -545,6 +545,8 @@ tokenize_finish:
 .end_macro
 .macro STBL_UNBLK
         addi    $s6, $s6, -4
+        lw      $t0, ($s6)
+        move    $s4, $t0
 .end_macro
 
 # Init:
