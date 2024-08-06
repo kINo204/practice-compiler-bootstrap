@@ -338,7 +338,7 @@ literal_int:
         li      $t1, ':'
         sltu    $t3, $t0, $t1
         and     $t1, $t2, $t3
-        beqz    $t1, keyword_int
+        beqz    $t1, keyword_if
         li      $t1, LITERAL_INT
 
         PRINT_STR(str_lexer_literal_int, "LITERAL_INT: ")
@@ -368,6 +368,46 @@ finish_li:
 
         j       tokenize_start
         nop
+
+keyword_if:
+        li      $t2, 'i'
+        li      $t3, 'f'
+
+        bne     $t0, $t2, keyword_else
+        lb      $t1, 0($s0)
+        bne     $t1, $t3, keyword_else
+        nop
+
+        PRINTLN_STR(str_lexer_keyword_if, "KEYWORD_IF")
+        li      $t1, KEYWORD_IF
+        sb      $t1, ($s1)
+        addi    $s0, $s0, 1
+
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
+keyword_else:
+        li      $t2, 'e'
+        li      $t3, 'l'
+        li      $t4, 's'
+        li      $t5, 'e'
+
+        bne     $t0, $t2, keyword_int
+        lb      $t1, 0($s0)
+        bne     $t1, $t3, keyword_int
+        lb      $t1, 1($s0)
+        bne     $t1, $t4, keyword_int
+        lb      $t1, 2($s0)
+        bne     $t1, $t5, keyword_int
+        nop
+
+        PRINTLN_STR(str_lexer_keyword_else, "KEYWORD_ELSE")
+        li      $t1, KEYWORD_ELSE
+        sb      $t1, ($s1)
+        addi    $s0, $s0, 3
+
+        j       tokenize_start
+        addi    $s1, $s1, 1
 
 keyword_int:
         li      $t2, 'i'
@@ -503,29 +543,12 @@ tokenize_finish:
         jal     write_buf
         nop
 .end_macro
-.macro BUF_TAG(%i_inc)
-        srl     $t1, $s2, 24
-        andi    $t1, $t1, 0xff
-        addi    $t1, $t1, 65
-        sb      $t1, 0($s1)
-
-        srl     $t1, $s2, 16
-        andi    $t1, $t1, 0xff
-        addi    $t1, $t1, 65
-        sb      $t1, 1($s1)
-
-        srl     $t1, $s2, 8
-        andi    $t1, $t1, 0xff
-        addi    $t1, $t1, 65
-        sb      $t1, 2($s1)
-
-        andi    $t1, $s2, 0xff
-        addi    $t1, $t1, 65
-        sb      $t1, 3($s1)
-
-        addi    $s1, $s1, 4
-
-        addi    $s2, $s2, %i_inc
+.macro BUF_TAG(%r_tag)
+        PSR(%r_tag)
+        BUF_APPEND(str_underline, 1)
+        jal     write_buf_uint
+        lw      $a0, ($sp)
+        PPR
 .end_macro
 # On entering(when parsing) a new var_scope, call this.
 .macro STBL_PUSH
@@ -562,7 +585,7 @@ tokenize_finish:
 
         lw      $s0, -0x0c($gp)  # $s0: token_list_index
         lw      $s1, -0x10($gp)  # $s1: output_buffer_index
-        li      $s2, 0           # $s2: tag_cnt (auto, don't occupy!)
+        li      $s2, 0           # $s2: tag_cnt
         lw      $s3, -0x14($gp)  # $s3: stbl_base
         move    $s4, $s3         # $s4: stbl_top
         li      $s5, 0           # $s5: cur_stack_ind
@@ -579,6 +602,7 @@ write_buf: # $a0: addr_str, $a1: strlen
         str_comma: .asciiz ":"
         str_endl:  .asciiz "\n"
         str_space: .asciiz " "
+        str_underline: .asciiz "_"
         str_nop:   .asciiz "\tnop\n" # 5
         .text
         PSR($ra)
@@ -911,6 +935,8 @@ parse_statement:
         beq     $t0, $t1, ps_decl_int
         li      $t1, OPEN_BRAC
         beq     $t0, $t1, ps_block
+        li      $t1, KEYWORD_IF
+        beq     $t0, $t1, ps_if
         nop
 
 ps_bare_exp: 
@@ -972,6 +998,75 @@ ps_return:
         BUF_APPEND(str_ppfp, 35)
         BUF_APPEND(str_ppra, 20)
         BUF_APPEND(str_jr, 13)
+        j       ps_finish
+        nop
+
+ps_if:
+        # Preserve 2 tags.
+        PSR($s2)
+        addi    $s2, $s2, 2
+
+        # Parse expr:
+        addi    $s0, $s0, 2
+        jal     parse_exp
+        nop
+
+        # beqz $v0, else
+        BUF_APPEND(str_pre_beqz_v0, 11)
+        lw      $t0, ($sp)
+        BUF_TAG($t0)
+        BUF_APPEND(str_endl, 1)
+        # nop
+        BUF_APPEND(str_nop, 5)
+
+        # Parse statement-if:
+        addi    $s0, $s0, 1
+        jal     parse_statement
+        nop
+
+        # Has else part:
+        lb      $t0, ($s0)
+        li      $t1, KEYWORD_ELSE
+        beq     $t0, $t1, ps_if_has_else
+        nop
+
+        # No else:
+        lw      $t0, ($sp)
+        BUF_TAG($t0)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+        j       ps_if_finish
+        nop
+
+ps_if_has_else:
+        # j finish
+        BUF_APPEND(str_pre_jump, 3)
+        lw      $t0, ($sp)
+        addi    $t0, $t0, 1
+        BUF_TAG($t0)
+        BUF_APPEND(str_endl, 1)
+        # nop
+        BUF_APPEND(str_nop, 5)
+        # else:
+        lw      $t0, ($sp)
+        BUF_TAG($t0)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+
+        # Parse statement-else:
+        addi    $s0, $s0, 1
+        jal     parse_statement
+        nop
+
+        # finish:
+        lw      $t0, ($sp)
+        addi    $t0, $t0, 1
+        BUF_TAG($t0)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+
+ps_if_finish:
+        PPR
         j       ps_finish
         nop
 
@@ -1054,22 +1149,16 @@ parse_or_exp:
         addi    $s2, $s2, 2
 
         BUF_APPEND(str_pre_bnez_v0, 11) # bnez $v0, f1
-        PSR($s2)
-        lw      $s2, 4($sp)
-        BUF_TAG(0)
-        lw      $s2, 0($sp)
-        PPR
+        lw      $t0, ($sp)
+        BUF_TAG($t0)
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_nop, 5) # nop
 poe_loop:
         jal     parse_and_exp   # Parse next and exp;
         addi    $s0, $s0, 1
         BUF_APPEND(str_pre_bnez_v0, 11) # bnez $v0, f1
-        PSR($s2)
-        lw      $s2, 4($sp)
-        BUF_TAG(0)
-        lw      $s2, 0($sp)
-        PPR
+        lw      $t0, ($sp)
+        BUF_TAG($t0)
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_nop, 5) # nop
         li      $t1, TOR        # Check for "||" token;
@@ -1084,27 +1173,25 @@ poe_gen:
         .text
         # j f
         BUF_APPEND(str_pre_jump, 3)
-        PSR($s2)
-        lw      $s2, 4($sp)
-        addi    $s2, $s2, 1
-        BUF_TAG(0)
+        lw      $t0, ($sp)
+        addi    $t0, $t0, 1
+        BUF_TAG($t0)
         BUF_APPEND(str_endl, 1)
         # li $v0, 0
         BUF_APPEND(str_pre_li_v0, 9)
         BUF_APPEND(str_char_0, 1)
         BUF_APPEND(str_endl, 1)
         # f1: li $v0, 1
-        addi    $s2, $s2, -1
-        BUF_TAG(0)
+        addi    $t0, $t0, -1
+        BUF_TAG($t0)
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_pre_li_v0, 9)
         BUF_APPEND(str_char_1, 1)
         BUF_APPEND(str_endl, 1)
         # f:
-        addi    $s2, $s2, 1
-        BUF_TAG(0)
-        lw      $s2, 0($sp)
-        PPR
+        addi    $t0, $t0, 1
+        BUF_TAG($t0)
+
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
 
@@ -1130,22 +1217,16 @@ parse_and_exp:
         addi    $s2, $s2, 2
 
         BUF_APPEND(str_pre_beqz_v0, 11) # beqz $v0, f0
-        PSR($s2)
-        lw      $s2, 4($sp)
-        BUF_TAG(0)
-        lw      $s2, 0($sp)
-        PPR
+        lw      $t0, ($sp)
+        BUF_TAG($t0)
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_nop, 5) # nop
 pa_loop:
         jal     parse_eql_exp   # Parse next eql exp;
         addi    $s0, $s0, 1
         BUF_APPEND(str_pre_beqz_v0, 11) # beqz $v0, f0
-        PSR($s2)
-        lw      $s2, 4($sp)
-        BUF_TAG(0)
-        lw      $s2, 0($sp)
-        PPR
+        lw      $t0, ($sp)
+        BUF_TAG($t0)
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_nop, 5) # nop
         li      $t1, TAND       # Check for "&& token;
@@ -1157,27 +1238,25 @@ pa_loop:
 pa_gen:
         # j f
         BUF_APPEND(str_pre_jump, 3)
-        PSR($s2)
-        lw      $s2, 4($sp)
-        addi    $s2, $s2, 1
-        BUF_TAG(0)
+        lw      $t0, ($sp)
+        addi    $t0, $t0, 1
+        BUF_TAG($t0)
         BUF_APPEND(str_endl, 1)
         # li $v0, 1
         BUF_APPEND(str_pre_li_v0, 9)
         BUF_APPEND(str_char_1, 1)
         BUF_APPEND(str_endl, 1)
         # f1: li $v0, 0
-        addi    $s2, $s2, -1
-        BUF_TAG(0)
+        addi    $t0, $t0, -1
+        BUF_TAG($t0)
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_pre_li_v0, 9)
         BUF_APPEND(str_char_0, 1)
         BUF_APPEND(str_endl, 1)
         # f:
-        addi    $s2, $s2, 1
-        BUF_TAG(0)
-        lw      $s2, 0($sp)
-        PPR
+        addi    $t0, $t0, 1
+        BUF_TAG($t0)
+
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
         # Reset $s2 after use.
@@ -1215,7 +1294,7 @@ peql_eql:
         BUF_APPEND(str_ppr, 5)
         # bne $v0, $v1
         BUF_APPEND(str_bne_v0_v1, 14)
-        BUF_TAG(0)
+        BUF_TAG($s2)
         BUF_APPEND(str_endl, 1)
         # li $v0, 0
         BUF_APPEND(str_pre_li_v0, 9)
@@ -1226,7 +1305,8 @@ peql_eql:
         BUF_APPEND(str_char_1, 1)
         BUF_APPEND(str_endl, 1)
         # f:
-        BUF_TAG(1)
+        BUF_TAG($s2)
+        addi    $s2, $s2, 1
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
         j       peql_finish
@@ -1240,7 +1320,7 @@ peql_neq:
         BUF_APPEND(str_ppr, 5)
         # beq $v0, $v1
         BUF_APPEND(str_beq_v0_v1, 14)
-        BUF_TAG(0)
+        BUF_TAG($s2)
         BUF_APPEND(str_endl, 1)
         # li $v0, 0
         BUF_APPEND(str_pre_li_v0, 9)
@@ -1251,7 +1331,8 @@ peql_neq:
         BUF_APPEND(str_char_1, 1)
         BUF_APPEND(str_endl, 1)
         # f:
-        BUF_TAG(1)
+        BUF_TAG($s2)
+        addi    $s2, $s2, 1
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
         j       peql_finish
@@ -1296,7 +1377,7 @@ prel_l:
         BUF_APPEND(str_ppr, 5)
         # bge $v1, $v0
         BUF_APPEND(str_bge_v1_v0, 14)
-        BUF_TAG(0)
+        BUF_TAG($s2)
         BUF_APPEND(str_endl, 1)
         # li $v0, 0
         BUF_APPEND(str_pre_li_v0, 9)
@@ -1307,7 +1388,8 @@ prel_l:
         BUF_APPEND(str_char_1, 1)
         BUF_APPEND(str_endl, 1)
         # f:
-        BUF_TAG(1)
+        BUF_TAG($s2)
+        addi    $s2, $s2, 1
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
         j       prel_finish
@@ -1321,7 +1403,7 @@ prel_le:
         BUF_APPEND(str_ppr, 5)
         # bgt $v1, $v0
         BUF_APPEND(str_bgt_v1_v0, 14)
-        BUF_TAG(0)
+        BUF_TAG($s2)
         BUF_APPEND(str_endl, 1)
         # li $v0, 0
         BUF_APPEND(str_pre_li_v0, 9)
@@ -1332,7 +1414,8 @@ prel_le:
         BUF_APPEND(str_char_1, 1)
         BUF_APPEND(str_endl, 1)
         # f:
-        BUF_TAG(1)
+        BUF_TAG($s2)
+        addi    $s2, $s2, 1
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
         j       prel_finish
@@ -1346,7 +1429,7 @@ prel_g:
         BUF_APPEND(str_ppr, 5)
         # ble $v1, $v0
         BUF_APPEND(str_ble_v1_v0, 14)
-        BUF_TAG(0)
+        BUF_TAG($s2)
         BUF_APPEND(str_endl, 1)
         # li $v0, 0
         BUF_APPEND(str_pre_li_v0, 9)
@@ -1357,7 +1440,8 @@ prel_g:
         BUF_APPEND(str_char_1, 1)
         BUF_APPEND(str_endl, 1)
         # f:
-        BUF_TAG(1)
+        BUF_TAG($s2)
+        addi    $s2, $s2, 1
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
         j       prel_finish
@@ -1371,7 +1455,7 @@ prel_ge:
         BUF_APPEND(str_ppr, 5)
         # blt $v1, $v0
         BUF_APPEND(str_blt_v1_v0, 14)
-        BUF_TAG(0)
+        BUF_TAG($s2)
         BUF_APPEND(str_endl, 1)
         # li $v0, 0
         BUF_APPEND(str_pre_li_v0, 9)
@@ -1382,7 +1466,8 @@ prel_ge:
         BUF_APPEND(str_char_1, 1)
         BUF_APPEND(str_endl, 1)
         # f:
-        BUF_TAG(1)
+        BUF_TAG($s2)
+        addi    $s2, $s2, 1
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
         j       prel_finish
@@ -1605,7 +1690,7 @@ pf_negation:
         BUF_APPEND(str_endl, 1)
         # beqz $v0, eqz
         BUF_APPEND(str_pre_beqz_v0, 11)
-        BUF_TAG(0)
+        BUF_TAG($s2)
         BUF_APPEND(str_endl, 1)
         # nop
         BUF_APPEND(str_nop, 5)
@@ -1614,7 +1699,8 @@ pf_negation:
         BUF_APPEND(str_char_0, 1)
         BUF_APPEND(str_endl, 1)
         # eqz:
-        BUF_TAG(1)
+        BUF_TAG($s2)
+        addi    $s2, $s2, 1
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
         # move $v0, $v1

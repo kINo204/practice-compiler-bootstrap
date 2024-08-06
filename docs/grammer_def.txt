@@ -20,6 +20,7 @@
         | <block>
         | keyword_return <exp> semicolon
         | <var_type> ident [ assign <exp> ] semicolon
+        | keyword_if open_par <exp> close_par <statement> [ keyword_else <statement> ]
         ;
 
 <block>

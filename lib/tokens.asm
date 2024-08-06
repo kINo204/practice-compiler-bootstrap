@@ -10,6 +10,8 @@
 .eqv    NEGATION        9
 .eqv    KEYWORD_INT     10
 .eqv    KEYWORD_RETURN  11
+.eqv    KEYWORD_IF      28
+.eqv    KEYWORD_ELSE    29
 .eqv    LITERAL_INT     12
 .eqv    LITERAL_HEX     13
 .eqv    IDENT           14
