@@ -538,6 +538,7 @@ tokenize_finish:
         lw      $s3, ($sp)
         PPR
 .end_macro
+# Compound statements(block) support:
 .macro STBL_BLK
         sw      $s4, ($s6)
         addi    $s6, $s6, 4
@@ -725,12 +726,45 @@ sym_add: # $a0 = var_size, $a1 = token_base
         jr      $ra
         nop
 
-sym_search: # $a0 = token_base, $v0 := sym_stack_index
+sym_search: # $a0 = token_base, $v0 := sym_stack_index (-1 if failed)
+        PSR($ra)
+        PSR($s6)
+
+ss_loop:
+        lw      $t0, -0x18($gp)
+        beq     $t0, $s6, ss_search_base
+        nop
+
+        addi    $s6, $s6, -4
+        jal     _sym_search
+        lw      $a2, ($s6) # search entry
+        bnez    $v0, ss_finish
+        nop
+        j       ss_loop
+        nop
+
+ss_search_base:
+        jal     _sym_search
+        move    $a2, $s3
+        bnez    $v0, ss_finish
+        nop
+        # Symbol not found
+        PRINTLN_STR(str_sym_not_found, "Symbol not found!")
+
+ss_finish:
+        lw      $s6, ($sp)
+        PPR
+        lw      $ra, ($sp)
+        PPR
+        jr      $ra
+        nop
+
+_sym_search: # $a0 = token_base, $a2 = search_ent, $v0 := sym_stack_index (-1 if failed)
         PSR($ra)
 
         lb      $a1, 1($a0) # ident_len expected
         addi    $a0, $a0, 2 # ident_base expected
-        move    $t0, $s3 # current symbol table search index
+        move    $t0, $a2 # current symbol table search index
         ssch_loop_entry:
         beq     $t0, $s4, sym_not_found
         lb      $t1, 1($t0) # ident_len
@@ -765,7 +799,7 @@ sym_search: # $a0 = token_base, $v0 := sym_stack_index
         j       ssch_finish
         lb      $v0, ($t0) # return val
         sym_not_found:
-        PRINTLN_STR(str_sym_not_found, "Parsing error: symbol not found!")
+        li      $v0, 0
 
         ssch_finish:
         lw      $ra, ($sp)

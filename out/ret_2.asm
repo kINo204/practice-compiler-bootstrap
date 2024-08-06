@@ -13,7 +13,7 @@ main:
 	sw	$v0, -0x00000004($fp)
 	li	$v0, 2
 	sw	$v0, -0x00000008($fp)
-	lw	$v0, -0x00000004($fp)
+	li	$v0, 1
 	PSR($v0)
 	lw	$v0, -0x00000008($fp)
 	lw	$v1, ($sp)

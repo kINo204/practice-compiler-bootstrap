@@ -3,7 +3,7 @@ int main() {
     int b;
     a = 4;
     b = 2;
-    return (a + b) * 4;
+    return (1 + b) * 4;
 }
 
 int func() {
