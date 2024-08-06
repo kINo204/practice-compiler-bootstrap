@@ -928,11 +928,27 @@ ps_decl_int:
         li      $a0, 4
         jal     sym_add
         addi    $a1, $s0, 1
-        # addi  $sp, $sp, -4
-        BUF_APPEND(str_sp_minus4, 19)
+        # Jump ident.
         lb      $t0, 2($s0)
         addi    $s0, $s0, 3
         addu    $s0, $s0, $t0
+
+        lb      $t0, ($s0)
+        li      $t1, ASSIGN
+        bne     $t0, $t1, bare_decl_int
+        nop
+        addi    $s0, $s0, 1
+        jal     parse_exp
+        nop
+        j       decl_int_finish
+        nop
+bare_decl_int:
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_0, 1)
+        BUF_APPEND(str_endl, 1)
+decl_int_finish:
+        BUF_APPEND(str_psr_v0, 10)
+
         j       ps_finish
         addi    $s0, $s0, 1 # jump ";"
 

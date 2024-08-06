@@ -19,7 +19,7 @@
         : <exp> semicolon
         | <block>
         | keyword_return <exp> semicolon
-        | <var_type> ident semicolon
+        | <var_type> ident [ assign <exp> ] semicolon
         ;
 
 <block>
