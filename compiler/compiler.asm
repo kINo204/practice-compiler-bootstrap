@@ -729,7 +729,6 @@ sym_add: # $a0 = var_size, $a1 = token_base
 sym_search: # $a0 = token_base, $v0 := sym_stack_index (-1 if failed)
         PSR($ra)
         PSR($s6)
-
 ss_loop:
         lw      $t0, -0x18($gp)
         beq     $t0, $s6, ss_search_base
@@ -742,15 +741,29 @@ ss_loop:
         nop
         j       ss_loop
         nop
-
 ss_search_base:
         jal     _sym_search
         move    $a2, $s3
         bnez    $v0, ss_finish
         nop
-        # Symbol not found
-        PRINTLN_STR(str_sym_not_found, "Symbol not found!")
-
+# Symbol not found
+        PSR($a0)
+        PRINT_STR(str_sym_not_found, "Symbol not found: ")
+        lw      $a0, 0($sp)
+        lb      $t2, 1($a0) # ident_len expected
+        addi    $t1, $a0, 2 # ident_base expected
+        li      $t0, 0
+ss_not_found_loop_char:
+        lb      $t3, ($t1)
+        PRINT_CH($t3)
+        addi    $t0, $t0, 1
+        addi    $t1, $t1, 1
+        bne     $t0, $t2, ss_not_found_loop_char
+        nop
+        ENDL
+        lw      $a0, 0($sp)
+        PPR
+        li      $v0, 0
 ss_finish:
         lw      $s6, ($sp)
         PPR
@@ -763,7 +776,7 @@ _sym_search: # $a0 = token_base, $a2 = search_ent, $v0 := sym_stack_index (-1 if
         PSR($ra)
 
         lb      $a1, 1($a0) # ident_len expected
-        addi    $a0, $a0, 2 # ident_base expected
+        addi    $t3, $a0, 2 # ident_base expected
         move    $t0, $a2 # current symbol table search index
         ssch_loop_entry:
         beq     $t0, $s4, sym_not_found
@@ -778,7 +791,6 @@ _sym_search: # $a0 = token_base, $a2 = search_ent, $v0 := sym_stack_index (-1 if
         ssch_le_same_len:
         li      $t1, 0 # loop ind
         addi    $t2, $t0, 2 # ident_ind
-        move    $t3, $a0    # ident_expected_ind
         ssch_loop_char:
         lb      $t4, ($t2)
         lb      $t5, ($t3)
@@ -1636,4 +1648,3 @@ parse_finish:
         lw      $t0, -0x10($gp) # output_buf_base
         subu    $t1, $s1, $t0 # output_buf_len
         WRITE($v0, $t0, $t1)
-
