@@ -414,11 +414,11 @@ keyword_int:
         li      $t3, 'n'
         li      $t4, 't'
 
-        bne     $t0, $t2, keyword_return
+        bne     $t0, $t2, keyword_while
         lb      $t1, 0($s0)
-        bne     $t1, $t3, keyword_return
+        bne     $t1, $t3, keyword_while
         lb      $t1, 1($s0)
-        bne     $t1, $t4, keyword_return
+        bne     $t1, $t4, keyword_while
         nop
 
         PRINTLN_STR(str_lexer_keyword_int, "KEYWORD_INT")
@@ -429,6 +429,95 @@ keyword_int:
         j       tokenize_start
         addi    $s1, $s1, 1
         
+keyword_while:
+        li      $t2, 'w'
+        li      $t3, 'h'
+        li      $t4, 'i'
+        li      $t5, 'l'
+        li      $t6, 'e'
+
+        bne     $t0, $t2, keyword_break
+        lb      $t1, 0($s0)
+        bne     $t1, $t3, keyword_break
+        lb      $t1, 1($s0)
+        bne     $t1, $t4, keyword_break
+        lb      $t1, 2($s0)
+        bne     $t1, $t5, keyword_break
+        lb      $t1, 3($s0)
+        bne     $t1, $t6, keyword_break
+        nop
+
+        PRINTLN_STR(str_lexer_keyword_while, "KEYWORD_WHILE")
+        li      $t1, KEYWORD_WHILE
+        sb      $t1, ($s1)
+        addi    $s0, $s0, 4
+
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
+keyword_break:
+        li      $t2, 'b'
+        li      $t3, 'r'
+        li      $t4, 'e'
+        li      $t5, 'a'
+        li      $t6, 'k'
+
+        bne     $t0, $t2, keyword_continue
+        lb      $t1, 0($s0)
+        bne     $t1, $t3, keyword_continue
+        lb      $t1, 1($s0)
+        bne     $t1, $t4, keyword_continue
+        lb      $t1, 2($s0)
+        bne     $t1, $t5, keyword_continue
+        lb      $t1, 3($s0)
+        bne     $t1, $t6, keyword_continue
+        nop
+
+        PRINTLN_STR(str_lexer_keyword_break, "KEYWORD_BREAK")
+        li      $t1, KEYWORD_BREAK
+        sb      $t1, ($s1)
+        addi    $s0, $s0, 4
+
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
+keyword_continue:
+        li      $t2, 'c'
+        li      $t3, 'o'
+        li      $t4, 'n'
+        li      $t5, 't'
+
+        bne     $t0, $t2, keyword_return
+        lb      $t1, 0($s0)
+        bne     $t1, $t3, keyword_return
+        lb      $t1, 1($s0)
+        bne     $t1, $t4, keyword_return
+        lb      $t1, 2($s0)
+        bne     $t1, $t5, keyword_return
+        nop
+
+        li      $t2, 'i'
+        li      $t3, 'n'
+        li      $t4, 'u'
+        li      $t5, 'e'
+
+        bne     $t0, $t2, keyword_return
+        lb      $t1, 3($s0)
+        bne     $t1, $t3, keyword_return
+        lb      $t1, 4($s0)
+        bne     $t1, $t4, keyword_return
+        lb      $t1, 5($s0)
+        bne     $t1, $t5, keyword_return
+        nop
+
+        PRINTLN_STR(str_lexer_keyword_continue, "KEYWORD_CONTINUE")
+        li      $t1, KEYWORD_CONTINUE
+        sb      $t1, ($s1)
+        addi    $s0, $s0, 7
+
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
 keyword_return:
         li      $t2, 'r'
         li      $t3, 'e'
@@ -590,6 +679,9 @@ tokenize_finish:
         move    $s4, $s3         # $s4: stbl_top
         li      $s5, 0           # $s5: cur_stack_ind
         lw      $s6, -0x18($gp)  # $s6: stbl_search_entry_sp
+
+        PSR($s2)                 # -0x1c($gp): current block first tag
+        # while: tag0 = while, tag1 = finish
 
         BUF_APPEND(str_include_lib, 26) # Add include statement.
         BUF_APPEND(str_sysent, 7) # Add system entry.
@@ -937,6 +1029,8 @@ parse_statement:
         beq     $t0, $t1, ps_block
         li      $t1, KEYWORD_IF
         beq     $t0, $t1, ps_if
+        li      $t1, KEYWORD_WHILE
+        beq     $t0, $t1, ps_while
         nop
 
 ps_bare_exp: 
@@ -1066,6 +1160,54 @@ ps_if_has_else:
         BUF_APPEND(str_endl, 1)
 
 ps_if_finish:
+        PPR
+        j       ps_finish
+        nop
+
+ps_while:
+        # Preserve 2 tags.
+        PSR($s2)
+        addi    $s2, $s2, 2
+
+        # while:
+        lw      $t0, ($sp)
+        BUF_TAG($t0)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+
+        # Parse expr:
+        addi    $s0, $s0, 2
+        jal     parse_exp
+        nop
+
+        # beqz $v0, finish
+        BUF_APPEND(str_pre_beqz_v0, 11)
+        lw      $t0, ($sp)
+        addi    $t0, $t0, 1
+        BUF_TAG($t0)
+        BUF_APPEND(str_endl, 1)
+        # nop
+        BUF_APPEND(str_nop, 5)
+
+        # Parse statement:
+        addi    $s0, $s0, 1
+        jal     parse_statement
+        nop
+
+        # j while
+        BUF_APPEND(str_pre_jump, 3)
+        lw      $t0, ($sp)
+        BUF_TAG($t0)
+        BUF_APPEND(str_endl, 1)
+        # nop
+        BUF_APPEND(str_nop, 5)
+        # finish:
+        lw      $t0, ($sp)
+        addi    $t0, $t0, 1
+        BUF_TAG($t0)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+
         PPR
         j       ps_finish
         nop
