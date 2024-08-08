@@ -373,9 +373,9 @@ keyword_if:
         li      $t2, 'i'
         li      $t3, 'f'
 
-        bne     $t0, $t2, keyword_else
+        bne     $t0, $t2, keyword_for
         lb      $t1, 0($s0)
-        bne     $t1, $t3, keyword_else
+        bne     $t1, $t3, keyword_for
         nop
 
         PRINTLN_STR(str_lexer_keyword_if, "KEYWORD_IF")
@@ -385,6 +385,27 @@ keyword_if:
 
         j       tokenize_start
         addi    $s1, $s1, 1
+
+keyword_for:
+        li      $t2, 'f'
+        li      $t3, 'o'
+        li      $t4, 'r'
+
+        bne     $t0, $t2, keyword_else
+        lb      $t1, 0($s0)
+        bne     $t1, $t3, keyword_else
+        lb      $t1, 1($s0)
+        bne     $t1, $t4, keyword_else
+        nop
+
+        PRINTLN_STR(str_lexer_keyword_for, "KEYWORD_FOR")
+        li      $t1, KEYWORD_FOR
+        sb      $t1, ($s1)
+        addi    $s0, $s0, 2
+
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
 
 keyword_else:
         li      $t2, 'e'
@@ -1025,6 +1046,8 @@ parse_statement:
         PSR($ra)
 
         lb      $t0, ($s0)
+        li      $t1, SEMICOLON
+        beq     $t0, $t1, ps_null_stat
         li      $t1, KEYWORD_RETURN
         beq     $t0, $t1, ps_return
         li      $t1, KEYWORD_INT
@@ -1035,15 +1058,25 @@ parse_statement:
         beq     $t0, $t1, ps_if
         li      $t1, KEYWORD_WHILE
         beq     $t0, $t1, ps_while
+        li      $t1, KEYWORD_FOR
+        beq     $t0, $t1, ps_for
         li      $t1, KEYWORD_BREAK
         beq     $t0, $t1, ps_break
         li      $t1, KEYWORD_CONTINUE
         beq     $t0, $t1, ps_continue
         nop
 
-ps_bare_exp: 
+ps_bare_exp: # Falls in here! This must be the 1st!
         jal     parse_exp
         nop
+        j       ps_finish
+        addi    $s0, $s0, 1 # jump semicolon
+
+ps_null_stat:
+        # Load $v0 with non-zero value.
+        BUF_APPEND(str_pre_li_v0, 9)
+        BUF_APPEND(str_char_1, 1)
+        BUF_APPEND(str_endl, 1)
         j       ps_finish
         addi    $s0, $s0, 1 # jump semicolon
 
@@ -1219,6 +1252,98 @@ ps_while:
         BUF_APPEND(str_endl, 1)
 
         addi    $s7, $s7, -4
+        PPR
+        j       ps_finish
+        nop
+
+ps_for:
+        # Reserve 4 tags.
+        PSR($s2)
+        sw      $s2, ($s7)
+        addi    $s7, $s7, 4
+        addi    $s2, $s2, 4
+
+        # Let index var unusable out of loop!
+        STBL_BLK
+
+        # Init statement:
+        addi    $s0, $s0, 2
+        jal     parse_statement
+        nop
+
+        # start:
+        lw      $t0, ($sp)
+        addi    $t0, $t0, 3
+        BUF_TAG($t0)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+
+        # Evaluating statement:
+        jal     parse_statement
+        nop
+
+        # beqz $v0, finish
+        BUF_APPEND(str_pre_beqz_v0, 11)
+        lw      $t0, ($sp)
+        addi    $t0, $t0, 1
+        BUF_TAG($t0)
+        BUF_APPEND(str_endl, 1)
+        # nop
+        BUF_APPEND(str_nop, 5)
+        # j body
+        BUF_APPEND(str_pre_jump, 3)
+        lw      $t0, ($sp)
+        addi    $t0, $t0, 2
+        BUF_TAG($t0)
+        BUF_APPEND(str_endl, 1)
+        # nop
+        BUF_APPEND(str_nop, 5)
+        # post:
+        lw      $t0, ($sp)
+        BUF_TAG($t0)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+
+        # Postfix assignment exp:
+        jal     parse_exp
+        nop
+
+        # j start
+        BUF_APPEND(str_pre_jump, 3)
+        lw      $t0, ($sp)
+        addi    $t0, $t0, 3
+        BUF_TAG($t0)
+        BUF_APPEND(str_endl, 1)
+        # nop
+        BUF_APPEND(str_nop, 5)
+        # body:
+        lw      $t0, ($sp)
+        addi    $t0, $t0, 2
+        BUF_TAG($t0)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+
+        # Loop body statement:
+        addi    $s0, $s0, 1
+        jal     parse_statement
+        nop
+
+        # j post
+        BUF_APPEND(str_pre_jump, 3)
+        lw      $t0, ($sp)
+        BUF_TAG($t0)
+        BUF_APPEND(str_endl, 1)
+        # nop
+        BUF_APPEND(str_nop, 5)
+        # finish:
+        lw      $t0, ($sp)
+        addi    $t0, $t0, 1
+        BUF_TAG($t0)
+        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_endl, 1)
+
+        STBL_UNBLK
+
         PPR
         j       ps_finish
         nop

@@ -22,6 +22,7 @@
         | <var_type> ident [ assign <exp> ] semicolon
         | keyword_if open_par <exp> close_par <statement> [ keyword_else <statement> ]
         | keyword_while open_par <exp> close_par <statement>
+        | keyword_for open_par <statement> <statement> <exp> close_par <statement>
         | keyword_break semicolon
         | keyword_continue semicolon
         ;
