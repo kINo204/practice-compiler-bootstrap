@@ -673,14 +673,28 @@ tokenize_finish:
         PPR
 .end_macro
 # Compound statements(block) support:
+.data
+str_move_k0_sp: .asciiz "\tmove\t$k0, $sp\n" # 15
+str_move_sp_k0: .asciiz "\tmove\t$sp, $k0\n"
+str_psr_k0: .asciiz "\tPSR($k0)\n" # 10
+str_lw_k0_sp: .asciiz "\tlw\t$k0, ($sp)\n" # 15
+.text
 .macro STBL_BLK
         sw      $s4, ($s6)
         addi    $s6, $s6, 4
+        BUF_APPEND(str_psr_k0, 10)
+        BUF_APPEND(str_move_k0_sp, 15)
+        PSR($s5)
+        addi    $s5, $s5, 4
 .end_macro
 .macro STBL_UNBLK
         addi    $s6, $s6, -4
-        lw      $t0, ($s6)
-        move    $s4, $t0
+        lw      $s4, ($s6)
+        lw      $s5, ($sp)
+        BUF_APPEND(str_move_sp_k0, 15)
+        BUF_APPEND(str_lw_k0_sp, 15)
+        BUF_APPEND(str_ppr, 5)
+        PPR
 .end_macro
 
 # Init:
@@ -690,7 +704,7 @@ tokenize_finish:
 .eqv    LSYMTBL 1000
         SBRK(LSYMTBL)
         PSR($v0) # symbol_table_base fpofs = -0x14
-.eqv    LSYMENTSTACK 40
+.eqv    LSYMENTSTACK 80
         SBRK(LSYMENTSTACK)
         PSR($v0) # symbol_search_entry_stack fpofs = -0x18
 .eqv    LLOOPTAGSTACK 40
@@ -1081,8 +1095,8 @@ ps_null_stat:
         addi    $s0, $s0, 1 # jump semicolon
 
 ps_block:
-        addi    $s0, $s0, 1 # jump {
         STBL_BLK
+        addi    $s0, $s0, 1 # jump {
         ps_block_loop_statement:
         jal     parse_statement
         nop
@@ -1257,14 +1271,14 @@ ps_while:
         nop
 
 ps_for:
+        # Let index var unusable out of loop!
+        STBL_BLK
+
         # Reserve 4 tags.
         PSR($s2)
         sw      $s2, ($s7)
         addi    $s7, $s7, 4
         addi    $s2, $s2, 4
-
-        # Let index var unusable out of loop!
-        STBL_BLK
 
         # Init statement:
         addi    $s0, $s0, 2
@@ -1342,9 +1356,9 @@ ps_for:
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
 
-        STBL_UNBLK
-
         PPR
+
+        STBL_UNBLK
         j       ps_finish
         nop
 
