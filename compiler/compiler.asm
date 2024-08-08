@@ -501,12 +501,13 @@ keyword_continue:
         li      $t4, 'u'
         li      $t5, 'e'
 
-        bne     $t0, $t2, keyword_return
         lb      $t1, 3($s0)
-        bne     $t1, $t3, keyword_return
+        bne     $t1, $t2, keyword_return
         lb      $t1, 4($s0)
-        bne     $t1, $t4, keyword_return
+        bne     $t1, $t3, keyword_return
         lb      $t1, 5($s0)
+        bne     $t1, $t4, keyword_return
+        lb      $t1, 6($s0)
         bne     $t1, $t5, keyword_return
         nop
 
@@ -671,6 +672,9 @@ tokenize_finish:
 .eqv    LSYMENTSTACK 40
         SBRK(LSYMENTSTACK)
         PSR($v0) # symbol_search_entry_stack fpofs = -0x18
+.eqv    LLOOPTAGSTACK 40
+        SBRK(LLOOPTAGSTACK)
+        PSR($v0) # loop_tag_stack fpofs = -0x1c
 
         lw      $s0, -0x0c($gp)  # $s0: token_list_index
         lw      $s1, -0x10($gp)  # $s1: output_buffer_index
@@ -680,7 +684,7 @@ tokenize_finish:
         li      $s5, 0           # $s5: cur_stack_ind
         lw      $s6, -0x18($gp)  # $s6: stbl_search_entry_sp
 
-        PSR($s2)                 # -0x1c($gp): current block first tag
+        lw      $s7, -0x1c($gp)  # $s6: stbl_search_entry_sp
         # while: tag0 = while, tag1 = finish
 
         BUF_APPEND(str_include_lib, 26) # Add include statement.
@@ -1031,6 +1035,10 @@ parse_statement:
         beq     $t0, $t1, ps_if
         li      $t1, KEYWORD_WHILE
         beq     $t0, $t1, ps_while
+        li      $t1, KEYWORD_BREAK
+        beq     $t0, $t1, ps_break
+        li      $t1, KEYWORD_CONTINUE
+        beq     $t0, $t1, ps_continue
         nop
 
 ps_bare_exp: 
@@ -1167,6 +1175,8 @@ ps_if_finish:
 ps_while:
         # Preserve 2 tags.
         PSR($s2)
+        sw      $s2, ($s7)
+        addi    $s7, $s7, 4
         addi    $s2, $s2, 2
 
         # while:
@@ -1208,7 +1218,31 @@ ps_while:
         BUF_APPEND(str_comma, 1)
         BUF_APPEND(str_endl, 1)
 
+        addi    $s7, $s7, -4
         PPR
+        j       ps_finish
+        nop
+
+ps_break:
+        BUF_APPEND(str_pre_jump, 3)
+        lw      $t0, -4($s7)
+        addi    $t0, $t0, 1
+        BUF_TAG($t0)
+        BUF_APPEND(str_endl, 1)
+        # nop
+        BUF_APPEND(str_nop, 5)
+        addi    $s0, $s0, 2
+        j       ps_finish
+        nop
+
+ps_continue:
+        BUF_APPEND(str_pre_jump, 3)
+        lw      $t0, -4($s7)
+        BUF_TAG($t0)
+        BUF_APPEND(str_endl, 1)
+        # nop
+        BUF_APPEND(str_nop, 5)
+        addi    $s0, $s0, 2
         j       ps_finish
         nop
 
