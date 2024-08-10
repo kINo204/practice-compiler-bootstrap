@@ -16,7 +16,7 @@ main:
 _0x00000003:
 	lw	$v0, -0x0000000c($fp)
 	PSR($v0)
-	li	$v0, 2
+	li	$v0, 10
 	lw	$v1, ($sp)
 	PPR
 	bge	$v1, $v0,_0x00000004
@@ -47,7 +47,7 @@ _0x00000002:
 _0x00000008:
 	lw	$v0, -0x00000018($fp)
 	PSR($v0)
-	li	$v0, 3
+	li	$v0, 10
 	lw	$v1, ($sp)
 	PPR
 	bge	$v1, $v0,_0x00000009
@@ -71,6 +71,23 @@ _0x00000005:
 _0x00000007:
 	PSR($k0)
 	move	$k0, $sp
+	lw	$v0, -0x00000018($fp)
+	PSR($v0)
+	li	$v0, 3
+	lw	$v1, ($sp)
+	PPR
+	bne	$v0, $v1,_0x0000000c
+	li	$v0, 0
+	li	$v0, 1
+_0x0000000c:
+	beqz	$v0, _0x0000000a
+	nop
+	move	$sp, $k0
+	lw	$k0, ($sp)
+	PPR
+	j	_0x00000006
+	nop
+_0x0000000a:
 	lw	$v0, -0x00000004($fp)
 	PSR($v0)
 	li	$v0, 1

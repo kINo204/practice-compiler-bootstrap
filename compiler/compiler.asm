@@ -1363,6 +1363,9 @@ ps_for:
         nop
 
 ps_break:
+        BUF_APPEND(str_move_sp_k0, 15)
+        BUF_APPEND(str_lw_k0_sp, 15)
+        BUF_APPEND(str_ppr, 5)
         BUF_APPEND(str_pre_jump, 3)
         lw      $t0, -4($s7)
         addi    $t0, $t0, 1
@@ -1375,6 +1378,9 @@ ps_break:
         nop
 
 ps_continue:
+        BUF_APPEND(str_move_sp_k0, 15)
+        BUF_APPEND(str_lw_k0_sp, 15)
+        BUF_APPEND(str_ppr, 5)
         BUF_APPEND(str_pre_jump, 3)
         lw      $t0, -4($s7)
         BUF_TAG($t0)
