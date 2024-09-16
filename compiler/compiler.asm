@@ -1030,7 +1030,6 @@ parse_func_def:
         #       PSR($fp)
         #       move $fp, $sp
         # """
-        li      $s5, 0 # reset local var stack ofs
         BUF_APPEND(str_textseg, 6)
         BUF_APPEND(str_globl, 7)
         addi    $s0, $s0, 2
@@ -1056,9 +1055,55 @@ parse_func_def:
 
         lw      $a1, 0($sp)
         addu    $s0, $s0, $a1 # $s0 on "open_par"
-        addi    $s0, $s0, 3
+        addi    $s0, $s0, 1 # jump open_par
         PPR
         PPR
+
+        li      $s5, 0 # reset local var stack ofs to 0 for local vars.
+        lb      $t0, ($s0)
+        li      $t1, CLOSE_PAR
+        beq     $t0, $t1, pfd_no_param
+        nop
+
+.data
+str_pre_lw_v0: .asciiz "\tlw\t$v0, " # 9
+str_deref_sp: .asciiz "($sp)\n" # 6
+str_sw_v0_sp: .asciiz "\tsw\t$v0, ($sp)\n" # 15
+.text
+pfd_deal_para:
+        addi    $s0, $s0, 2 # s0 point at 'num'
+        lb      $t0, ($s0) # $t0 = param nums
+        addi    $t0, $t0, -48 # - val of char '0'
+        addi    $t0, $t0, 2
+        sll     $t0, $t0, 2
+        PSR($t0)
+        addi    $s0, $s0, 1 # $s0 on first para
+
+pfd_dp_loop:
+        lb      $t0, ($s0)
+        li      $t1, CLOSE_PAR
+        beq     $t0, $t1, pfd_dp_loop_end
+        nop
+
+        jal     parse_statement
+        nop
+        # lw $v0, ofs($sp)
+        BUF_APPEND(str_pre_lw_v0, 9)
+        lw      $a0, ($sp)
+        jal     write_buf_uint
+        nop
+        BUF_APPEND(str_deref_sp, 6)
+        # sw $v0, ($sp)
+        BUF_APPEND(str_sw_v0_sp, 15)
+
+        j       pfd_dp_loop
+        nop
+
+pfd_dp_loop_end:
+        PPR
+
+pfd_no_param:
+        addi    $s0, $s0, 2 # jump close_par, open_brac
 
 pfd_loop:
         lb      $t0, ($s0)
@@ -1956,6 +2001,15 @@ parse_fact:
         nop
 
 pf_ident:
+        # Check if it's a function call
+        lb      $t0, 1($s0)
+        addu    $t0, $t0, $s0
+        addi    $t0, $t0, 2
+        lb      $t0, ($t0)
+        li      $t1, OPEN_PAR
+        beq     $t0, $t1, pf_func_call
+        nop
+
         # lw    $v0, -st_ofs($fp)
         BUF_APPEND(str_pre_lw_v0_minus, 10)
         move    $a0, $s0
@@ -1969,6 +2023,69 @@ pf_ident:
         addi    $s0, $s0, 1
         addu    $s0, $s0, $t0
 
+        j       pf_finish
+        nop
+
+pf_func_call:
+        addi    $t0, $s0, 2
+        PSR($t0) # funcname addr
+        lb      $t0, 1($s0)
+        PSR($t0) # funcname len
+        addu    $s0, $s0, $t0
+        addi    $s0, $s0, 2 # $s0 on open_par
+
+        PSR($zero) # param cnt
+
+        # Push params
+pf_fc_push_loop:
+        lb      $t0, ($s0)
+        li      $t1, CLOSE_PAR
+        beq     $t0, $t1, pf_fc_push_loop_end
+        addi    $s0, $s0, 1
+
+        # cnt++
+        lw      $t0, ($sp)
+        addi    $t0, $t0, 1
+        sw      $t0, ($sp)
+        # $v0 = param
+        jal     parse_exp
+        nop
+        # PSR($v0)
+        BUF_APPEND(str_psr_v0, 10)
+
+        j       pf_fc_push_loop
+        nop
+
+pf_fc_push_loop_end:
+        # jal func
+.data
+str_pre_jal: .asciiz "\tjal\t" # 5
+.text
+        BUF_APPEND(str_pre_jal, 5)
+        lw      $a0, 8($sp)
+        lw      $a1, 4($sp)
+        jal     write_buf
+        nop
+        BUF_APPEND(str_endl, 1)
+        # nop
+        BUF_APPEND(str_nop, 5)
+
+        # Pop params
+pf_fc_pop_loop:
+        lw      $t0, ($sp)
+        beqz     $t0, pf_fc_pop_loop_end
+        nop
+
+        addi    $t0, $t0, -1
+        sw      $t0, ($sp)
+        BUF_APPEND(str_ppr, 5)
+        j       pf_fc_pop_loop
+        nop
+
+pf_fc_pop_loop_end:
+        PPR
+        PPR
+        PPR
         j       pf_finish
         nop
 

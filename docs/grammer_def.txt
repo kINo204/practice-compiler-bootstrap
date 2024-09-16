@@ -68,6 +68,7 @@
         | <unary_op> <factor>
         | <literal> 
         | ident
+        | ident open_par [ <exp> { comma <exp> } ] close_par
         ;
 
 <unary_op>
