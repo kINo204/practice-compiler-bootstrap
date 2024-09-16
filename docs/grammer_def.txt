@@ -1,9 +1,11 @@
 <program>
-        : <func_def>*
+        : { <func_def> }
         ;
 
 <func_def>
-        : <func_type> ident open_par close_par open_brac { <statement> } close_brac
+        : <func_type> ident open_par
+                [ <var_type> ident { comma <var_type> ident } ]
+                close_par open_brac { <statement> } close_brac
         ;
 
 <func_type>
@@ -13,6 +15,7 @@
 
 <var_type>
         : keyword_int
+        : keyword_char
         ;
 
 <statement>

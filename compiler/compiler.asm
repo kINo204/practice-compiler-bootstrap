@@ -92,7 +92,7 @@ open_brac:
 
 close_brac:
         li      $t1, '}'
-        bne     $t0, $t1, semicolon
+        bne     $t0, $t1, comma
         li      $t1, CLOSE_BRAC
 
         PRINTLN_STR(str_lexer_close_brac, "CLOSE_BRAC")
@@ -100,6 +100,16 @@ close_brac:
         j       tokenize_start
         addi    $s1, $s1, 1
         
+comma:
+        li      $t1, ','
+        bne     $t0, $t1, semicolon
+        li      $t1, COMMA
+
+        PRINTLN_STR(str_lexer_comma, "COMMA")
+        sb      $t1, ($s1)
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
 semicolon:
         li      $t1, ';'
         bne     $t0, $t1, assignment
@@ -406,12 +416,34 @@ keyword_for:
         j       tokenize_start
         addi    $s1, $s1, 1
 
-
 keyword_else:
         li      $t2, 'e'
         li      $t3, 'l'
         li      $t4, 's'
         li      $t5, 'e'
+
+        bne     $t0, $t2, keyword_char
+        lb      $t1, 0($s0)
+        bne     $t1, $t3, keyword_char
+        lb      $t1, 1($s0)
+        bne     $t1, $t4, keyword_char
+        lb      $t1, 2($s0)
+        bne     $t1, $t5, keyword_char
+        nop
+
+        PRINTLN_STR(str_lexer_keyword_else, "KEYWORD_ELSE")
+        li      $t1, KEYWORD_ELSE
+        sb      $t1, ($s1)
+        addi    $s0, $s0, 3
+
+        j       tokenize_start
+        addi    $s1, $s1, 1
+
+keyword_char:
+        li      $t2, 'c'
+        li      $t3, 'h'
+        li      $t4, 'a'
+        li      $t5, 'r'
 
         bne     $t0, $t2, keyword_int
         lb      $t1, 0($s0)
@@ -422,8 +454,8 @@ keyword_else:
         bne     $t1, $t5, keyword_int
         nop
 
-        PRINTLN_STR(str_lexer_keyword_else, "KEYWORD_ELSE")
-        li      $t1, KEYWORD_ELSE
+        PRINTLN_STR(str_lexer_keyword_char, "KEYWORD_CHAR")
+        li      $t1, KEYWORD_CHAR
         sb      $t1, ($s1)
         addi    $s0, $s0, 3
 
@@ -718,10 +750,10 @@ str_lw_k0_sp: .asciiz "\tlw\t$k0, ($sp)\n" # 15
         move    $s4, $s3         # $s4: stbl_top
         li      $s5, 0           # $s5: cur_stack_ind
         lw      $s6, -0x18($gp)  # $s6: stbl_search_entry_sp
-
-        lw      $s7, -0x1c($gp)  # $s6: stbl_search_entry_sp
+        lw      $s7, -0x1c($gp)  # $s7
         # while: tag0 = while, tag1 = finish
 
+# Print headers.
         BUF_APPEND(str_include_lib, 26) # Add include statement.
         BUF_APPEND(str_sysent, 7) # Add system entry.
         j       parse_program
@@ -730,7 +762,7 @@ str_lw_k0_sp: .asciiz "\tlw\t$k0, ($sp)\n" # 15
 # Function utils
 write_buf: # $a0: addr_str, $a1: strlen
         .data
-        str_comma: .asciiz ":"
+        str_colon: .asciiz ":"
         str_endl:  .asciiz "\n"
         str_space: .asciiz " "
         str_underline: .asciiz "_"
@@ -1017,7 +1049,7 @@ parse_func_def:
         lw      $a1, 0($sp)
         jal     write_buf
         nop
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
         BUF_APPEND(str_psra, 10)
         BUF_APPEND(str_psfp, 25)
@@ -1182,7 +1214,7 @@ ps_if:
         # No else:
         lw      $t0, ($sp)
         BUF_TAG($t0)
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
         j       ps_if_finish
         nop
@@ -1199,7 +1231,7 @@ ps_if_has_else:
         # else:
         lw      $t0, ($sp)
         BUF_TAG($t0)
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
 
         # Parse statement-else:
@@ -1211,7 +1243,7 @@ ps_if_has_else:
         lw      $t0, ($sp)
         addi    $t0, $t0, 1
         BUF_TAG($t0)
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
 
 ps_if_finish:
@@ -1229,7 +1261,7 @@ ps_while:
         # while:
         lw      $t0, ($sp)
         BUF_TAG($t0)
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
 
         # Parse expr:
@@ -1262,7 +1294,7 @@ ps_while:
         lw      $t0, ($sp)
         addi    $t0, $t0, 1
         BUF_TAG($t0)
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
 
         addi    $s7, $s7, -4
@@ -1289,7 +1321,7 @@ ps_for:
         lw      $t0, ($sp)
         addi    $t0, $t0, 3
         BUF_TAG($t0)
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
 
         # Evaluating statement:
@@ -1315,7 +1347,7 @@ ps_for:
         # post:
         lw      $t0, ($sp)
         BUF_TAG($t0)
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
 
         # Postfix assignment exp:
@@ -1334,7 +1366,7 @@ ps_for:
         lw      $t0, ($sp)
         addi    $t0, $t0, 2
         BUF_TAG($t0)
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
 
         # Loop body statement:
@@ -1353,7 +1385,7 @@ ps_for:
         lw      $t0, ($sp)
         addi    $t0, $t0, 1
         BUF_TAG($t0)
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
 
         PPR
@@ -1505,7 +1537,7 @@ poe_gen:
         # f1: li $v0, 1
         addi    $t0, $t0, -1
         BUF_TAG($t0)
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_pre_li_v0, 9)
         BUF_APPEND(str_char_1, 1)
         BUF_APPEND(str_endl, 1)
@@ -1513,7 +1545,7 @@ poe_gen:
         addi    $t0, $t0, 1
         BUF_TAG($t0)
 
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
 
         # PPR $s2 after use.
@@ -1570,7 +1602,7 @@ pa_gen:
         # f1: li $v0, 0
         addi    $t0, $t0, -1
         BUF_TAG($t0)
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_pre_li_v0, 9)
         BUF_APPEND(str_char_0, 1)
         BUF_APPEND(str_endl, 1)
@@ -1578,7 +1610,7 @@ pa_gen:
         addi    $t0, $t0, 1
         BUF_TAG($t0)
 
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
         # Reset $s2 after use.
         PPR
@@ -1628,7 +1660,7 @@ peql_eql:
         # f:
         BUF_TAG($s2)
         addi    $s2, $s2, 1
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
         j       peql_finish
         nop
@@ -1654,7 +1686,7 @@ peql_neq:
         # f:
         BUF_TAG($s2)
         addi    $s2, $s2, 1
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
         j       peql_finish
         nop
@@ -1711,7 +1743,7 @@ prel_l:
         # f:
         BUF_TAG($s2)
         addi    $s2, $s2, 1
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
         j       prel_finish
         nop
@@ -1737,7 +1769,7 @@ prel_le:
         # f:
         BUF_TAG($s2)
         addi    $s2, $s2, 1
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
         j       prel_finish
         nop
@@ -1763,7 +1795,7 @@ prel_g:
         # f:
         BUF_TAG($s2)
         addi    $s2, $s2, 1
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
         j       prel_finish
         nop
@@ -1789,7 +1821,7 @@ prel_ge:
         # f:
         BUF_TAG($s2)
         addi    $s2, $s2, 1
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
         j       prel_finish
         nop
@@ -2022,7 +2054,7 @@ pf_negation:
         # eqz:
         BUF_TAG($s2)
         addi    $s2, $s2, 1
-        BUF_APPEND(str_comma, 1)
+        BUF_APPEND(str_colon 1)
         BUF_APPEND(str_endl, 1)
         # move $v0, $v1
         BUF_APPEND(str_move_v0_v1, 15)

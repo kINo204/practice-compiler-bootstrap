@@ -16,6 +16,8 @@
 .eqv    KEYWORD_BREAK   31
 .eqv    KEYWORD_CONTINUE    32
 .eqv    KEYWORD_FOR     33
+.eqv    COMMA           34
+.eqv    KEYWORD_CHAR    35
 .eqv    LITERAL_INT     12
 .eqv    LITERAL_HEX     13
 .eqv    IDENT           14
