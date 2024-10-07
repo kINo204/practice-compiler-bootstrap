@@ -45,6 +45,8 @@ main:
 	jal	func
 	nop
 	PPR
+	PSR($v0)
+	lw	$v0, -0x00000004($fp)
 	move	$sp, $fp
 	lw	$fp, ($sp)
 	PPR
